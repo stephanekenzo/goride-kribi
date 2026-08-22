@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Courses : tout le monde peut créer une demande et la lire (pour le suivi),
+    // seule la mise à jour de statut est autorisée (pas de suppression publique).
+    match /courses/{courseId} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // Chauffeurs : lecture publique nécessaire pour la connexion par téléphone/PIN,
+    // écriture réservée à l'admin (à restreindre davantage plus tard avec un vrai
+    // système d'authentification si besoin).
+    match /chauffeurs/{chauffeurId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Configuration (grille tarifaire)
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

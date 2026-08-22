@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoRide Kribi</title>
+<meta name="description" content="Réservez un chauffeur à Kribi en quelques secondes">
+<meta name="theme-color" content="#0b3b39">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ocean-deep: #0b3b39;
+  --ocean-mid: #124d4a;
+  --ocean-line: #1c625d;
+  --sand: #f1e9d8;
+  --sand-dim: #d9cdb0;
+  --rust: #c1502e;
+  --rust-bright: #de6339;
+  --palm: #4c7a5e;
+  --palm-bright: #6ba885;
+  --ink: #10201c;
+  --font-display: 'Fraunces', serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--ocean-deep); color: var(--sand); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font-family: var(--font-body); cursor: pointer; }
+::selection { background: var(--rust); color: var(--sand); }
+:focus-visible { outline: 2px solid var(--rust-bright); outline-offset: 2px; }
+.page { min-height: 100dvh; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--ocean-line); }
+.brand { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: 0.01em; display: flex; align-items: baseline; gap: 6px; }
+.brand-mark { color: var(--rust-bright); }
+.nav-link { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sand-dim); text-decoration: none; border: 1px solid var(--ocean-line); padding: 8px 12px; border-radius: 100px; transition: border-color 0.15s ease, color 0.15s ease; background: transparent; }
+.nav-link:hover { border-color: var(--rust-bright); color: var(--sand); }
+.main { flex: 1; padding: 28px 20px 60px; max-width: 560px; width: 100%; margin: 0 auto; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--palm-bright); margin: 0 0 8px; }
+h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); font-weight: 600; line-height: 1.1; margin: 0 0 6px; }
+.subtitle { color: var(--sand-dim); font-size: 15px; line-height: 1.5; margin: 0 0 28px; }
+.route-strip { position: relative; padding: 4px 0 0; margin-bottom: 28px; }
+.route-strip-line { position: absolute; top: 21px; left: 14px; right: 14px; height: 2px; background: var(--ocean-line); }
+.route-stops { display: flex; gap: 0; position: relative; }
+.route-stop { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; background: transparent; border: none; padding: 0 4px; color: var(--sand-dim); }
+.route-stop-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ocean-line); background: var(--ocean-deep); transition: all 0.15s ease; }
+.route-stop.active .route-stop-dot { border-color: var(--rust-bright); background: var(--rust-bright); box-shadow: 0 0 0 4px rgba(222, 99, 57, 0.2); }
+.route-stop-label { font-size: 11px; line-height: 1.3; font-weight: 500; }
+.route-stop.active .route-stop-label { color: var(--sand); }
+.route-stop-price { font-family: var(--font-mono); font-size: 10px; color: var(--palm-bright); }
+.card { background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sand-dim); margin-bottom: 6px; }
+.field input, .field select { width: 100%; background: var(--ocean-deep); border: 1px solid var(--ocean-line); border-radius: 10px; padding: 13px 14px; color: var(--sand); font-size: 15px; font-family: var(--font-body); }
+.field input:focus, .field select:focus { border-color: var(--rust-bright); }
+.field input::placeholder { color: var(--sand-dim); opacity: 0.6; }
+.fare-display { display: flex; align-items: baseline; justify-content: space-between; padding-top: 16px; margin-top: 4px; border-top: 1px dashed var(--ocean-line); }
+.fare-label { font-size: 13px; color: var(--sand-dim); }
+.fare-amount { font-family: var(--font-mono); font-size: 26px; font-weight: 600; color: var(--rust-bright); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 15px 20px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; font-family: var(--font-body); transition: transform 0.1s ease, opacity 0.15s ease; }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--rust); color: var(--sand); }
+.btn-primary:hover:not(:disabled) { background: var(--rust-bright); }
+.btn-secondary { background: transparent; border: 1px solid var(--ocean-line); color: var(--sand); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--sand-dim); }
+.btn-ghost { background: transparent; color: var(--sand-dim); font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; border: none; }
+.status-pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 10px; border-radius: 100px; }
+.status-pill.attente { background: rgba(222, 99, 57, 0.18); color: var(--rust-bright); }
+.status-pill.acceptee { background: rgba(107, 168, 133, 0.18); color: var(--palm-bright); }
+.status-pill.terminee { background: rgba(217, 205, 176, 0.15); color: var(--sand-dim); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ride-card { background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.ride-route { font-family: var(--font-display); font-size: 17px; margin: 8px 0 4px; }
+.ride-meta { font-size: 13px; color: var(--sand-dim); margin-bottom: 12px; }
+.ride-price { font-family: var(--font-mono); font-weight: 600; color: var(--rust-bright); }
+.empty-state { text-align: center; padding: 50px 20px; color: var(--sand-dim); }
+.empty-state-title { font-family: var(--font-display); font-size: 19px; color: var(--sand); margin-bottom: 6px; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; }
+.toggle-switch { position: relative; width: 48px; height: 28px; border-radius: 100px; border: none; background: var(--ocean-line); transition: background 0.15s ease; }
+.toggle-switch.on { background: var(--palm); }
+.toggle-switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--sand); transition: transform 0.15s ease; }
+.toggle-switch.on .toggle-switch-knob { transform: translateX(20px); }
+.confirmation-banner { background: var(--palm); border-radius: 16px; padding: 24px 20px; text-align: center; margin-bottom: 20px; }
+.confirmation-banner .eyebrow { color: rgba(241, 233, 216, 0.8); }
+.table-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; }
+.stat-chip { flex-shrink: 0; background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 12px; padding: 12px 16px; min-width: 90px; cursor: pointer; text-align: left; }
+.stat-chip-label { font-size: 11px; color: var(--sand-dim); }
+.driver-row { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; background: var(--ocean-deep); border: 1px solid var(--ocean-line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; color: var(--sand); }
+.driver-row.selected { background: rgba(222,99,57,0.12); border-color: var(--rust-bright); }
+.driver-row-name { display: block; font-weight: 600; font-size: 14px; }
+.driver-row-vehicule { font-size: 12px; color: var(--sand-dim); }
+.driver-row-distance { font-family: var(--font-mono); font-size: 12px; color: var(--palm-bright); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, doc, onSnapshot, getDoc,
+  serverTimestamp, query, where
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+// ⚠️ Remplacez ces valeurs par celles de VOTRE projet Firebase
+// (Console Firebase > Paramètres du projet > Général > Vos applications).
+// Le même bloc doit être copié dans chauffeur.html et admin.html.
+const firebaseConfig = {
+  apiKey: "VOTRE_API_KEY",
+  authDomain: "VOTRE_PROJET.firebaseapp.com",
+  projectId: "VOTRE_PROJET",
+  storageBucket: "VOTRE_PROJET.appspot.com",
+  messagingSenderId: "VOTRE_SENDER_ID",
+  appId: "VOTRE_APP_ID",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ZONES_PAR_DEFAUT = [
+  { id: "ville", nom: "En ville (intra-muros)", description: "Trajet dans le centre-ville de Kribi", prix: 3000 },
+  { id: "sortie_proche", nom: "Sortie ville — proche", description: "Jusqu'au sud de la Dobé", prix: 5000 },
+  { id: "sortie_eloignee", nom: "Sortie ville — éloignée", description: "Au-delà, selon distance", prix: 10000 },
+  { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", prixMin: 40000, prixMax: 45000 },
+  { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", prixMin: 50000, prixMax: 60000 },
+];
+
+function distanceKm(lat1, lng1, lat2, lng2) {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+function formatDistance(km) {
+  if (km == null) return "";
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
+function formatFCFA(n) {
+  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
+}
+function prixAffiche(zone) {
+  if (zone.prix) return zone.prix;
+  if (zone.prixMin && zone.prixMax) return Math.round((zone.prixMin + zone.prixMax) / 2);
+  return 0;
+}
+
+const state = {
+  zones: ZONES_PAR_DEFAUT,
+  zoneId: ZONES_PAR_DEFAUT[0].id,
+  depart: "", destination: "", nom: "", telephone: "",
+  envoi: false, erreur: "",
+  courseId: null, course: null,
+  pickupCoords: null, localisation: "inactive", // inactive | recherche | ok | refuse
+  modeChoix: "broadcast", // broadcast | direct
+  chauffeurCible: null, chauffeursDispo: [],
+};
+
+let unsubCourse = null;
+let unsubChauffeurs = null;
+
+getDoc(doc(db, "config", "tarifs")).then((snap) => {
+  if (snap.exists() && snap.data().zones) {
+    state.zones = snap.data().zones;
+    state.zoneId = state.zones[0].id;
+    render();
+  }
+}).catch(() => {});
+
+function zoneActuelle() {
+  return state.zones.find((z) => z.id === state.zoneId) || state.zones[0];
+}
+
+function chauffeursTries() {
+  return [...state.chauffeursDispo].sort((a, b) => {
+    if (!state.pickupCoords) return a.nom.localeCompare(b.nom);
+    const da = distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, a.lat, a.lng);
+    const db_ = distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, b.lat, b.lng);
+    if (da == null) return 1;
+    if (db_ == null) return -1;
+    return da - db_;
+  });
+}
+
+function localiser() {
+  if (!navigator.geolocation) { state.localisation = "refuse"; render(); return; }
+  state.localisation = "recherche";
+  render();
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      state.pickupCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      state.localisation = "ok";
+      render();
+    },
+    () => { state.localisation = "refuse"; render(); },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function setMode(mode) {
+  state.modeChoix = mode;
+  if (mode === "direct" && !unsubChauffeurs) {
+    const q = query(collection(db, "chauffeurs"), where("statut", "==", "disponible"));
+    unsubChauffeurs = onSnapshot(q, (snap) => {
+      state.chauffeursDispo = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => c.actif !== false);
+      render();
+    });
+  }
+  render();
+}
+
+function choisirChauffeur(c) { state.chauffeurCible = c; render(); }
+
+async function reserver(e) {
+  e.preventDefault();
+  state.erreur = "";
+  if (!state.depart.trim() || !state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
+    state.erreur = "Merci de remplir tous les champs.";
+    render();
+    return;
+  }
+  if (state.modeChoix === "direct" && !state.chauffeurCible) {
+    state.erreur = "Choisissez un chauffeur dans la liste, ou passez en envoi à tous.";
+    render();
+    return;
+  }
+  state.envoi = true;
+  render();
+  const zone = zoneActuelle();
+  try {
+    const ref = await addDoc(collection(db, "courses"), {
+      zoneId: zone.id,
+      zoneNom: zone.nom,
+      depart: state.depart.trim(),
+      destination: state.destination.trim(),
+      clientNom: state.nom.trim(),
+      clientTelephone: state.telephone.trim(),
+      tarif: prixAffiche(zone),
+      statut: "en_attente",
+      chauffeurId: null, chauffeurNom: null, chauffeurTelephone: null, chauffeurVehicule: null,
+      chauffeurCibleId: state.modeChoix === "direct" ? state.chauffeurCible.id : null,
+      pickupLat: state.pickupCoords ? state.pickupCoords.lat : null,
+      pickupLng: state.pickupCoords ? state.pickupCoords.lng : null,
+      createdAt: serverTimestamp(),
+    });
+    state.courseId = ref.id;
+    unsubCourse = onSnapshot(doc(db, "courses", ref.id), (snap) => {
+      if (snap.exists()) { state.course = { id: snap.id, ...snap.data() }; render(); }
+    });
+  } catch (err) {
+    state.erreur = "Erreur lors de l'envoi. Réessayez.";
+  } finally {
+    state.envoi = false;
+    render();
+  }
+}
+
+function nouvelleCourse() {
+  if (unsubCourse) unsubCourse();
+  state.courseId = null; state.course = null;
+  state.depart = ""; state.destination = ""; state.chauffeurCible = null;
+  render();
+}
+
+function vueFormulaire() {
+  const zone = zoneActuelle();
+  const tarif = prixAffiche(zone);
+  return `
+    <p class="eyebrow">Réservation</p>
+    <h1 class="title">Où allez-vous ?</h1>
+    <p class="subtitle">Choisissez votre trajet, le tarif s'affiche automatiquement.</p>
+
+    <div class="route-strip">
+      <div class="route-strip-line"></div>
+      <div class="route-stops">
+        ${state.zones.map((z) => `
+          <button type="button" class="route-stop ${z.id === state.zoneId ? "active" : ""}" data-action="zone" data-id="${z.id}">
+            <span class="route-stop-dot"></span>
+            <span class="route-stop-label">${z.nom}</span>
+            <span class="route-stop-price">${z.prix ? formatFCFA(z.prix) : `${formatFCFA(z.prixMin)} – ${formatFCFA(z.prixMax)}`}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="card" style="padding-bottom:14px;">
+      <label style="display:block;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--sand-dim);margin-bottom:10px;">
+        Comment envoyer votre demande ?
+      </label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn ${state.modeChoix === "broadcast" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="broadcast">À tous les chauffeurs</button>
+        <button type="button" class="btn ${state.modeChoix === "direct" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="direct">Choisir un chauffeur</button>
+      </div>
+      ${state.modeChoix === "direct" ? vueChoixChauffeur() : ""}
+    </div>
+
+    <form class="card" id="form-reservation">
+      <div class="field">
+        <label for="depart">Point de départ</label>
+        <input id="depart" data-field="depart" placeholder="Ex. Rond-point Kribi centre" value="${escAttr(state.depart)}">
+      </div>
+      ${state.modeChoix === "broadcast" && state.localisation !== "ok" ? `
+        <button type="button" class="btn btn-secondary" data-action="localiser" style="margin-bottom:16px;">
+          ${state.localisation === "recherche" ? "Localisation…" : "Partager ma position (facultatif)"}
+        </button>` : ""}
+      ${state.localisation === "ok" ? `<p style="font-size:12px;color:var(--palm-bright);margin-top:-8px;margin-bottom:16px;">Position enregistrée — le chauffeur verra votre distance.</p>` : ""}
+      <div class="field">
+        <label for="destination">Destination</label>
+        <input id="destination" data-field="destination" placeholder="Ex. Hôtel Ilomba" value="${escAttr(state.destination)}">
+      </div>
+      <div class="field">
+        <label for="nom">Votre nom</label>
+        <input id="nom" data-field="nom" placeholder="Nom et prénom" value="${escAttr(state.nom)}">
+      </div>
+      <div class="field">
+        <label for="telephone">Votre téléphone</label>
+        <input id="telephone" data-field="telephone" placeholder="6XX XX XX XX" value="${escAttr(state.telephone)}">
+      </div>
+      <div class="fare-display">
+        <span class="fare-label">${zone.nom}</span>
+        <span class="fare-amount">${zone.prix ? formatFCFA(zone.prix) : `~ ${formatFCFA(tarif)}`}</span>
+      </div>
+      ${!zone.prix ? `<p style="font-size:12px;color:var(--sand-dim);margin-top:8px;">Prix indicatif (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>` : ""}
+      ${state.erreur ? `<p style="color:var(--rust-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
+      <button class="btn btn-primary" style="margin-top:16px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
+        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "direct" && state.chauffeurCible ? `Réserver avec ${state.chauffeurCible.nom}` : "Réserver ce trajet")}
+      </button>
+    </form>
+  `;
+}
+
+function vueChoixChauffeur() {
+  const liste = chauffeursTries();
+  return `
+    <div style="margin-top:16px;">
+      ${state.localisation !== "ok" ? `
+        <button type="button" class="btn btn-secondary" data-action="localiser" style="margin-bottom:14px;">
+          ${state.localisation === "recherche" ? "Localisation…" : "Localiser les chauffeurs proches de moi"}
+        </button>` : ""}
+      ${state.localisation === "refuse" ? `<p style="font-size:12px;color:var(--sand-dim);margin-bottom:12px;">Position non disponible — les chauffeurs sont affichés par ordre alphabétique.</p>` : ""}
+      ${liste.length === 0 ? `<p style="font-size:13px;color:var(--sand-dim);">Aucun chauffeur disponible pour le moment.</p>` : ""}
+      ${liste.map((c) => {
+        const d = state.pickupCoords ? distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, c.lat, c.lng) : null;
+        const selected = state.chauffeurCible && state.chauffeurCible.id === c.id;
+        return `
+          <button type="button" class="driver-row ${selected ? "selected" : ""}" data-action="choisir-chauffeur" data-id="${c.id}">
+            <span><span class="driver-row-name">${c.nom}</span><span class="driver-row-vehicule">${c.vehicule || "véhicule non renseigné"}</span></span>
+            <span class="driver-row-distance">${d != null ? formatDistance(d) : ""}</span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function vueSuivi() {
+  const c = state.course;
+  if (!c) return `<p class="subtitle">Chargement…</p>`;
+  if (c.statut === "en_attente") {
+    return `
+      <div class="card" style="text-align:center;padding:32px 20px;">
+        <span class="status-pill attente"><span class="status-dot"></span> En attente</span>
+        <h2 style="font-family:var(--font-display);font-size:22px;margin:16px 0 8px;">Recherche d'un chauffeur…</h2>
+        <p class="subtitle" style="margin-bottom:0;">
+          ${c.chauffeurCibleId ? "Votre demande a été envoyée au chauffeur choisi." : "Votre demande a été envoyée aux chauffeurs disponibles."}
+          Cette page se mettra à jour dès qu'un chauffeur accepte.
+        </p>
+      </div>
+    `;
+  }
+  if (c.statut === "acceptee") {
+    return `
+      <div class="confirmation-banner">
+        <p class="eyebrow">Chauffeur trouvé</p>
+        <h2 style="font-family:var(--font-display);font-size:24px;margin:6px 0 0;color:var(--sand);">${c.chauffeurNom}</h2>
+      </div>
+      <div class="card">
+        <div class="field" style="margin-bottom:12px;"><label>Véhicule</label><p style="margin:0;">${c.chauffeurVehicule || "—"}</p></div>
+        <div class="field" style="margin-bottom:0;"><label>Téléphone</label><p style="margin:0;font-family:var(--font-mono);">${c.chauffeurTelephone || "—"}</p></div>
+      </div>
+      <p class="ride-route">${c.depart} → ${c.destination}</p>
+      <p class="ride-price">${formatFCFA(c.tarif)}</p>
+      <button class="btn btn-secondary" style="margin-top:20px;" data-action="nouvelle-course">Nouvelle réservation</button>
+    `;
+  }
+  return `
+    <div class="card" style="text-align:center;">
+      <p class="subtitle" style="margin-bottom:16px;">Course ${c.statut}.</p>
+      <button class="btn btn-secondary" data-action="nouvelle-course">Nouvelle réservation</button>
+    </div>
+  `;
+}
+
+function escAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="page">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">Go</span>Ride Kribi</div>
+        <a href="chauffeur.html" class="nav-link">Espace chauffeur</a>
+      </header>
+      <main class="main">
+        ${state.courseId ? vueSuivi() : vueFormulaire()}
+      </main>
+    </div>
+  `;
+
+  app.querySelectorAll('[data-field]').forEach((el) => {
+    el.addEventListener("input", (e) => { state[el.dataset.field] = e.target.value; });
+  });
+
+  const form = document.getElementById("form-reservation");
+  if (form) form.addEventListener("submit", reserver);
+}
+
+// Délégation de clic attachée UNE SEULE FOIS (le conteneur #app persiste
+// entre les rendus, seul son innerHTML change).
+document.getElementById("app").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === "zone") { state.zoneId = btn.dataset.id; render(); }
+  if (action === "mode") { setMode(btn.dataset.id); }
+  if (action === "localiser") { localiser(); }
+  if (action === "choisir-chauffeur") {
+    const c = state.chauffeursDispo.find((x) => x.id === btn.dataset.id);
+    if (c) choisirChauffeur(c);
+  }
+  if (action === "nouvelle-course") { nouvelleCourse(); }
+});
+
+render();
+</script>
+</body>
+</html>
