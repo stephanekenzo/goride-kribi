@@ -9,7 +9,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
+
 :root {
   --ocean-deep: #0b3b39;
   --ocean-mid: #124d4a;
@@ -93,16 +95,19 @@ h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); 
 .driver-row-name { display: block; font-weight: 600; font-size: 14px; }
 .driver-row-vehicule { font-size: 12px; color: var(--sand-dim); }
 .driver-row-distance { font-family: var(--font-mono); font-size: 12px; color: var(--palm-bright); }
-</style>
-</head>
+.carte-suivi { height: 240px; border-radius: 14px; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--ocean-line); background: var(--ocean-mid); }
+.leaflet-container { background: var(--ocean-mid); font-family: var(--font-body); }
+.recherche-etape { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--sand-dim); }
+.recherche-etape .status-dot { background: var(--rust-bright); }
+</style></head>
 <body>
 <div id="app"></div>
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   getFirestore, collection, addDoc, doc, onSnapshot, getDoc,
-  serverTimestamp, query, where
+  serverTimestamp, query, where, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // ⚠️ Remplacez ces valeurs par celles de VOTRE projet Firebase
@@ -121,6 +126,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Délai avant de proposer la course au chauffeur disponible suivant
+// (le plus proche n'ayant pas répondu) — modèle "cascade" façon Yango.
+const DELAI_CASCADE_MS = 40000;
 
 const ZONES_PAR_DEFAUT = [
   { id: "ville", nom: "En ville (intra-muros)", description: "Trajet dans le centre-ville de Kribi", prix: 3000 },
@@ -150,20 +159,25 @@ function prixAffiche(zone) {
   if (zone.prixMin && zone.prixMax) return Math.round((zone.prixMin + zone.prixMax) / 2);
   return 0;
 }
+function escAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
 
 const state = {
   zones: ZONES_PAR_DEFAUT,
   zoneId: ZONES_PAR_DEFAUT[0].id,
   depart: "", destination: "", nom: "", telephone: "",
   envoi: false, erreur: "",
-  courseId: null, course: null,
-  pickupCoords: null, localisation: "inactive", // inactive | recherche | ok | refuse
-  modeChoix: "broadcast", // broadcast | direct
+  courseId: null, course: null, chauffeurPosition: null,
+  pickupCoords: null, localisation: "recherche", // recherche | ok | refuse
+  modeChoix: "auto", // auto | manuel
   chauffeurCible: null, chauffeursDispo: [],
 };
 
 let unsubCourse = null;
-let unsubChauffeurs = null;
+let unsubChauffeurPosition = null;
+let unsubChauffeursDispo = null;
+let carte = null;
 
 getDoc(doc(db, "config", "tarifs")).then((snap) => {
   if (snap.exists() && snap.data().zones) {
@@ -175,6 +189,15 @@ getDoc(doc(db, "config", "tarifs")).then((snap) => {
 
 function zoneActuelle() {
   return state.zones.find((z) => z.id === state.zoneId) || state.zones[0];
+}
+
+function ecouterChauffeursDispo() {
+  if (unsubChauffeursDispo) return;
+  const q = query(collection(db, "chauffeurs"), where("statut", "==", "disponible"));
+  unsubChauffeursDispo = onSnapshot(q, (snap) => {
+    state.chauffeursDispo = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => c.actif !== false);
+    render();
+  });
 }
 
 function chauffeursTries() {
@@ -196,62 +219,110 @@ function localiser() {
     (pos) => {
       state.pickupCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       state.localisation = "ok";
+      ecouterChauffeursDispo();
       render();
     },
     () => { state.localisation = "refuse"; render(); },
     { enableHighAccuracy: true, timeout: 10000 }
   );
 }
+// On tente la localisation dès l'ouverture, comme Yango.
+localiser();
 
 function setMode(mode) {
   state.modeChoix = mode;
-  if (mode === "direct" && !unsubChauffeurs) {
-    const q = query(collection(db, "chauffeurs"), where("statut", "==", "disponible"));
-    unsubChauffeurs = onSnapshot(q, (snap) => {
-      state.chauffeursDispo = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => c.actif !== false);
-      render();
-    });
-  }
+  if (mode === "manuel") ecouterChauffeursDispo();
   render();
 }
 
 function choisirChauffeur(c) { state.chauffeurCible = c; render(); }
 
+function planifierCascade(courseRef, index) {
+  setTimeout(async () => {
+    let snap;
+    try { snap = await getDoc(courseRef); } catch (e) { return; }
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.statut !== "en_attente") return; // acceptée entre-temps, on arrête
+    const candidats = data.candidatsIds || [];
+    const suivant = index + 1;
+    if (suivant < candidats.length) {
+      await updateDoc(courseRef, { chauffeurCibleId: candidats[suivant], candidatIndex: suivant });
+      planifierCascade(courseRef, suivant);
+    } else if (data.chauffeurCibleId !== null) {
+      // Plus aucun candidat proche n'a répondu : on ouvre à tous les chauffeurs disponibles.
+      await updateDoc(courseRef, { chauffeurCibleId: null, candidatIndex: suivant });
+    }
+  }, DELAI_CASCADE_MS);
+}
+
 async function reserver(e) {
   e.preventDefault();
   state.erreur = "";
-  if (!state.depart.trim() || !state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
+  if (!state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
     state.erreur = "Merci de remplir tous les champs.";
     render();
     return;
   }
-  if (state.modeChoix === "direct" && !state.chauffeurCible) {
-    state.erreur = "Choisissez un chauffeur dans la liste, ou passez en envoi à tous.";
+  if (state.modeChoix === "auto" && state.localisation !== "ok" && !state.depart.trim()) {
+    state.erreur = "Indiquez votre point de départ, ou activez la localisation.";
+    render();
+    return;
+  }
+  if (state.modeChoix === "manuel" && !state.chauffeurCible) {
+    state.erreur = "Choisissez un chauffeur dans la liste, ou passez en mode automatique.";
     render();
     return;
   }
   state.envoi = true;
   render();
   const zone = zoneActuelle();
+
+  let chauffeurCibleId = null;
+  let candidatsIds = [];
+  if (state.modeChoix === "manuel") {
+    chauffeurCibleId = state.chauffeurCible.id;
+  } else if (state.pickupCoords) {
+    candidatsIds = chauffeursTries().map((c) => c.id);
+    chauffeurCibleId = candidatsIds.length > 0 ? candidatsIds[0] : null;
+  }
+
   try {
     const ref = await addDoc(collection(db, "courses"), {
       zoneId: zone.id,
       zoneNom: zone.nom,
-      depart: state.depart.trim(),
+      depart: state.depart.trim() || "Ma position actuelle",
       destination: state.destination.trim(),
       clientNom: state.nom.trim(),
       clientTelephone: state.telephone.trim(),
       tarif: prixAffiche(zone),
       statut: "en_attente",
       chauffeurId: null, chauffeurNom: null, chauffeurTelephone: null, chauffeurVehicule: null,
-      chauffeurCibleId: state.modeChoix === "direct" ? state.chauffeurCible.id : null,
+      chauffeurCibleId,
+      candidatsIds,
+      candidatIndex: 0,
       pickupLat: state.pickupCoords ? state.pickupCoords.lat : null,
       pickupLng: state.pickupCoords ? state.pickupCoords.lng : null,
       createdAt: serverTimestamp(),
     });
     state.courseId = ref.id;
+
+    if (candidatsIds.length > 0) planifierCascade(doc(db, "courses", ref.id), 0);
+
     unsubCourse = onSnapshot(doc(db, "courses", ref.id), (snap) => {
-      if (snap.exists()) { state.course = { id: snap.id, ...snap.data() }; render(); }
+      if (!snap.exists()) return;
+      const data = snap.data();
+      state.course = { id: snap.id, ...data };
+      if (data.statut === "acceptee" && data.chauffeurId && !unsubChauffeurPosition) {
+        unsubChauffeurPosition = onSnapshot(doc(db, "chauffeurs", data.chauffeurId), (csnap) => {
+          if (csnap.exists()) {
+            const cd = csnap.data();
+            state.chauffeurPosition = (cd.lat != null && cd.lng != null) ? { lat: cd.lat, lng: cd.lng } : null;
+            render();
+          }
+        });
+      }
+      render();
     });
   } catch (err) {
     state.erreur = "Erreur lors de l'envoi. Réessayez.";
@@ -262,8 +333,10 @@ async function reserver(e) {
 }
 
 function nouvelleCourse() {
-  if (unsubCourse) unsubCourse();
-  state.courseId = null; state.course = null;
+  if (unsubCourse) { unsubCourse(); unsubCourse = null; }
+  if (unsubChauffeurPosition) { unsubChauffeurPosition(); unsubChauffeurPosition = null; }
+  if (carte) { carte.remove(); carte = null; }
+  state.courseId = null; state.course = null; state.chauffeurPosition = null;
   state.depart = ""; state.destination = ""; state.chauffeurCible = null;
   render();
 }
@@ -274,7 +347,9 @@ function vueFormulaire() {
   return `
     <p class="eyebrow">Réservation</p>
     <h1 class="title">Où allez-vous ?</h1>
-    <p class="subtitle">Choisissez votre trajet, le tarif s'affiche automatiquement.</p>
+    <p class="subtitle">
+      ${state.localisation === "recherche" ? "Localisation en cours…" : state.localisation === "ok" ? "Votre position a été détectée. Choisissez votre trajet." : "Position non détectée — indiquez votre départ manuellement."}
+    </p>
 
     <div class="route-strip">
       <div class="route-strip-line"></div>
@@ -291,25 +366,29 @@ function vueFormulaire() {
 
     <div class="card" style="padding-bottom:14px;">
       <label style="display:block;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--sand-dim);margin-bottom:10px;">
-        Comment envoyer votre demande ?
+        Attribution du chauffeur
       </label>
       <div style="display:flex;gap:8px;">
-        <button type="button" class="btn ${state.modeChoix === "broadcast" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="broadcast">À tous les chauffeurs</button>
-        <button type="button" class="btn ${state.modeChoix === "direct" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="direct">Choisir un chauffeur</button>
+        <button type="button" class="btn ${state.modeChoix === "auto" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="auto">Automatique (recommandé)</button>
+        <button type="button" class="btn ${state.modeChoix === "manuel" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="manuel">Choisir moi-même</button>
       </div>
-      ${state.modeChoix === "direct" ? vueChoixChauffeur() : ""}
+      ${state.modeChoix === "auto" ? `
+        <p style="font-size:12px;color:var(--sand-dim);margin-top:12px;margin-bottom:0;">
+          ${state.pickupCoords ? "Le chauffeur disponible le plus proche est contacté en premier. S'il ne répond pas sous 40 secondes, le suivant est contacté automatiquement." : "Sans position détectée, la demande sera envoyée à tous les chauffeurs disponibles."}
+        </p>
+      ` : vueChoixChauffeur()}
     </div>
 
     <form class="card" id="form-reservation">
-      <div class="field">
-        <label for="depart">Point de départ</label>
-        <input id="depart" data-field="depart" placeholder="Ex. Rond-point Kribi centre" value="${escAttr(state.depart)}">
-      </div>
-      ${state.modeChoix === "broadcast" && state.localisation !== "ok" ? `
+      ${state.localisation !== "ok" ? `
+        <div class="field">
+          <label for="depart">Point de départ</label>
+          <input id="depart" data-field="depart" placeholder="Ex. Rond-point Kribi centre" value="${escAttr(state.depart)}">
+        </div>
         <button type="button" class="btn btn-secondary" data-action="localiser" style="margin-bottom:16px;">
-          ${state.localisation === "recherche" ? "Localisation…" : "Partager ma position (facultatif)"}
-        </button>` : ""}
-      ${state.localisation === "ok" ? `<p style="font-size:12px;color:var(--palm-bright);margin-top:-8px;margin-bottom:16px;">Position enregistrée — le chauffeur verra votre distance.</p>` : ""}
+          ${state.localisation === "recherche" ? "Localisation…" : "Réessayer la localisation"}
+        </button>
+      ` : `<p style="font-size:12px;color:var(--palm-bright);margin-top:0;margin-bottom:16px;">📍 Position détectée automatiquement.</p>`}
       <div class="field">
         <label for="destination">Destination</label>
         <input id="destination" data-field="destination" placeholder="Ex. Hôtel Ilomba" value="${escAttr(state.destination)}">
@@ -329,7 +408,7 @@ function vueFormulaire() {
       ${!zone.prix ? `<p style="font-size:12px;color:var(--sand-dim);margin-top:8px;">Prix indicatif (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>` : ""}
       ${state.erreur ? `<p style="color:var(--rust-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
       <button class="btn btn-primary" style="margin-top:16px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
-        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "direct" && state.chauffeurCible ? `Réserver avec ${state.chauffeurCible.nom}` : "Réserver ce trajet")}
+        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "manuel" && state.chauffeurCible ? `Réserver avec ${state.chauffeurCible.nom}` : "Réserver ce trajet")}
       </button>
     </form>
   `;
@@ -339,11 +418,6 @@ function vueChoixChauffeur() {
   const liste = chauffeursTries();
   return `
     <div style="margin-top:16px;">
-      ${state.localisation !== "ok" ? `
-        <button type="button" class="btn btn-secondary" data-action="localiser" style="margin-bottom:14px;">
-          ${state.localisation === "recherche" ? "Localisation…" : "Localiser les chauffeurs proches de moi"}
-        </button>` : ""}
-      ${state.localisation === "refuse" ? `<p style="font-size:12px;color:var(--sand-dim);margin-bottom:12px;">Position non disponible — les chauffeurs sont affichés par ordre alphabétique.</p>` : ""}
       ${liste.length === 0 ? `<p style="font-size:13px;color:var(--sand-dim);">Aucun chauffeur disponible pour le moment.</p>` : ""}
       ${liste.map((c) => {
         const d = state.pickupCoords ? distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, c.lat, c.lng) : null;
@@ -363,12 +437,17 @@ function vueSuivi() {
   const c = state.course;
   if (!c) return `<p class="subtitle">Chargement…</p>`;
   if (c.statut === "en_attente") {
+    const enCascade = c.candidatsIds && c.candidatsIds.length > 0 && c.chauffeurCibleId;
     return `
       <div class="card" style="text-align:center;padding:32px 20px;">
         <span class="status-pill attente"><span class="status-dot"></span> En attente</span>
         <h2 style="font-family:var(--font-display);font-size:22px;margin:16px 0 8px;">Recherche d'un chauffeur…</h2>
         <p class="subtitle" style="margin-bottom:0;">
-          ${c.chauffeurCibleId ? "Votre demande a été envoyée au chauffeur choisi." : "Votre demande a été envoyée aux chauffeurs disponibles."}
+          ${enCascade
+            ? "Le chauffeur disponible le plus proche a été contacté en premier. S'il ne répond pas, le suivant sera contacté automatiquement."
+            : c.chauffeurCibleId
+            ? "Votre demande a été envoyée au chauffeur choisi."
+            : "Votre demande a été envoyée à tous les chauffeurs disponibles."}
           Cette page se mettra à jour dès qu'un chauffeur accepte.
         </p>
       </div>
@@ -380,6 +459,7 @@ function vueSuivi() {
         <p class="eyebrow">Chauffeur trouvé</p>
         <h2 style="font-family:var(--font-display);font-size:24px;margin:6px 0 0;color:var(--sand);">${c.chauffeurNom}</h2>
       </div>
+      <div id="carte-suivi" class="carte-suivi"></div>
       <div class="card">
         <div class="field" style="margin-bottom:12px;"><label>Véhicule</label><p style="margin:0;">${c.chauffeurVehicule || "—"}</p></div>
         <div class="field" style="margin-bottom:0;"><label>Téléphone</label><p style="margin:0;font-family:var(--font-mono);">${c.chauffeurTelephone || "—"}</p></div>
@@ -397,8 +477,33 @@ function vueSuivi() {
   `;
 }
 
-function escAttr(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+function mettreAJourCarte() {
+  const mapEl = document.getElementById("carte-suivi");
+  if (carte) { carte.remove(); carte = null; }
+  if (!mapEl || !state.course || state.course.statut !== "acceptee") return;
+
+  const pos = state.chauffeurPosition;
+  const pickup = state.pickupCoords || (state.course.pickupLat != null ? { lat: state.course.pickupLat, lng: state.course.pickupLng } : null);
+  const centre = pos || pickup || { lat: 2.9500, lng: 9.9100 }; // Kribi par défaut si aucune position connue
+
+  carte = L.map(mapEl, { zoomControl: false }).setView([centre.lat, centre.lng], 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
+  }).addTo(carte);
+
+  const iconChauffeur = L.divIcon({
+    html: '<div style="background:#de6339;width:16px;height:16px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 0 0 3px rgba(222,99,57,0.3);"></div>',
+    className: "", iconSize: [16, 16], iconAnchor: [8, 8],
+  });
+  const iconDepart = L.divIcon({
+    html: '<div style="background:#6ba885;width:12px;height:12px;border-radius:50%;border:2px solid #f1e9d8;"></div>',
+    className: "", iconSize: [12, 12], iconAnchor: [6, 6],
+  });
+
+  const bounds = [];
+  if (pos) { L.marker([pos.lat, pos.lng], { icon: iconChauffeur }).addTo(carte).bindPopup("Chauffeur"); bounds.push([pos.lat, pos.lng]); }
+  if (pickup) { L.marker([pickup.lat, pickup.lng], { icon: iconDepart }).addTo(carte).bindPopup("Départ"); bounds.push([pickup.lat, pickup.lng]); }
+  if (bounds.length === 2) carte.fitBounds(bounds, { padding: [30, 30] });
 }
 
 function render() {
@@ -421,10 +526,10 @@ function render() {
 
   const form = document.getElementById("form-reservation");
   if (form) form.addEventListener("submit", reserver);
+
+  mettreAJourCarte();
 }
 
-// Délégation de clic attachée UNE SEULE FOIS (le conteneur #app persiste
-// entre les rendus, seul son innerHTML change).
 document.getElementById("app").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;

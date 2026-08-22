@@ -76,19 +76,39 @@ Onglet "Tarifs" du panel admin — modifiable à tout moment.
 
 ---
 
-## Comment ça marche
+## Comment ça marche (modèle façon Yango)
 
-- **Client** : choisit une zone (tarif automatique), remplit départ/
-  destination/nom/téléphone, envoie à tous les chauffeurs disponibles ou
-  choisit un chauffeur précis dans une liste triée par distance (position
-  partagée volontairement). Suivi en temps réel jusqu'à l'acceptation.
+- **Client** : la localisation se lance automatiquement à l'ouverture.
+  Le client choisit une zone (tarif automatique), indique sa destination,
+  son nom et son téléphone. Par défaut ("Automatique"), la demande est
+  envoyée au chauffeur disponible le plus proche ; s'il ne répond pas
+  sous 40 secondes, elle passe automatiquement au suivant, puis au
+  suivant, jusqu'à épuisement (elle est alors ouverte à tous). Le client
+  peut aussi choisir "Choisir moi-même" pour sélectionner un chauffeur
+  précis dans la liste triée par distance. Une fois la course acceptée,
+  une **carte en direct** (OpenStreetMap, sans clé API) affiche la
+  position du chauffeur qui se met à jour automatiquement.
 - **Chauffeur** : connexion téléphone + PIN. Tant qu'il est "disponible",
-  sa position GPS est envoyée à Firestore toutes les ~20 secondes. Les
-  demandes générales sont triées de la plus proche à la plus lointaine ;
-  alerte sonore + notification navigateur à l'arrivée d'une nouvelle
-  demande.
-- **Admin** : vue de toutes les courses, gestion des chauffeurs (ajout,
-  modification, désactivation, suppression), grille tarifaire.
+  sa position GPS est envoyée à Firestore toutes les ~20 secondes. Il voit
+  en priorité les demandes qui lui sont directement adressées (cascade),
+  puis les demandes ouvertes à tous, triées de la plus proche à la plus
+  lointaine ; alerte sonore + notification navigateur à l'arrivée d'une
+  nouvelle demande.
+- **Admin** : vue de toutes les courses (avec un bouton "Libérer à tous
+  les chauffeurs" pour débloquer une demande restée bloquée sur un
+  chauffeur, par exemple si le client a fermé son navigateur avant la fin
+  de la cascade), gestion des chauffeurs (ajout, modification,
+  désactivation, suppression), grille tarifaire.
+
+### Limite importante de la cascade automatique
+
+La cascade (passer au chauffeur suivant après 40 secondes) est pilotée
+par le **navigateur du client**, pas par un serveur — ce projet n'utilise
+aucun serveur pour rester simple à déployer (pas de Cloud Functions). Si
+le client ferme la page avant qu'un chauffeur accepte, la cascade s'arrête
+et la demande reste assignée au dernier chauffeur contacté. C'est pour
+ça que le bouton "Libérer à tous les chauffeurs" existe dans l'admin —
+utilisez-le si une course semble bloquée sans réponse.
 
 ## Notes de sécurité (comme pour vos autres apps)
 

@@ -199,6 +199,7 @@ async function enregistrerChauffeur(e) {
 }
 
 async function basculerActif(c) { await updateDoc(doc(db, "chauffeurs", c.id), { actif: !(c.actif !== false) }); }
+async function libererCourse(c) { await updateDoc(doc(db, "courses", c.id), { chauffeurCibleId: null, candidatsIds: [] }); }
 async function supprimerChauffeur(c) { if (confirm(`Supprimer ${c.nom} ?`)) await deleteDoc(doc(db, "chauffeurs", c.id)); }
 
 function modifierZone(index, champ, valeur) {
@@ -242,6 +243,11 @@ function vueCourses() {
       <p class="ride-route">${c.depart} → ${c.destination}</p>
       <p class="ride-meta">${c.clientNom} · ${c.clientTelephone}${c.chauffeurNom ? ` · Chauffeur : ${c.chauffeurNom}` : ""}</p>
       <p class="ride-price">${formatFCFA(c.tarif)}</p>
+      ${c.statut === "en_attente" && c.chauffeurCibleId ? `
+        <button class="btn btn-secondary" style="margin-top:12px;" data-action="liberer-course" data-id="${c.id}">
+          Libérer à tous les chauffeurs
+        </button>
+      ` : ""}
     </div>
   `).join("");
 }
@@ -362,6 +368,7 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (action === "basculer-actif") { const c = state.chauffeurs.find((x) => x.id === id); if (c) basculerActif(c); }
   if (action === "supprimer-chauffeur") { const c = state.chauffeurs.find((x) => x.id === id); if (c) supprimerChauffeur(c); }
   if (action === "enregistrer-tarifs") enregistrerTarifs();
+  if (action === "liberer-course") { const c = state.courses.find((x) => x.id === id); if (c) libererCourse(c); }
 });
 
 render();
