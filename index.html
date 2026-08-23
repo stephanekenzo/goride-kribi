@@ -9,20 +9,20 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 
 :root {
-  --ocean-deep: #fff5f8;
-  --ocean-mid: #ffffff;
-  --ocean-line: #f6c9dd;
-  --sand: #3d1f2b;
-  --sand-dim: #9c7683;
-  --rust: #d6336c;
-  --rust-bright: #e8487f;
-  --palm: #ff8fab;
-  --palm-bright: #d6336c;
-  --ink: #2b1620;
+  --ocean-deep: #0b3b39;
+  --ocean-mid: #124d4a;
+  --ocean-line: #1c625d;
+  --sand: #f1e9d8;
+  --sand-dim: #d9cdb0;
+  --rust: #c1502e;
+  --rust-bright: #de6339;
+  --palm: #4c7a5e;
+  --palm-bright: #6ba885;
+  --ink: #10201c;
   --font-display: 'Fraunces', serif;
   --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
@@ -70,9 +70,9 @@ h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); 
 .btn-secondary:hover:not(:disabled) { border-color: var(--sand-dim); }
 .btn-ghost { background: transparent; color: var(--sand-dim); font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; border: none; }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 10px; border-radius: 100px; }
-.status-pill.attente { background: rgba(232, 72, 127, 0.16); color: var(--rust-bright); }
-.status-pill.acceptee { background: rgba(214, 51, 108, 0.14); color: var(--palm-bright); }
-.status-pill.terminee { background: rgba(156, 118, 131, 0.14); color: var(--sand-dim); }
+.status-pill.attente { background: rgba(222, 99, 57, 0.18); color: var(--rust-bright); }
+.status-pill.acceptee { background: rgba(107, 168, 133, 0.18); color: var(--palm-bright); }
+.status-pill.terminee { background: rgba(217, 205, 176, 0.15); color: var(--sand-dim); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .ride-card { background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
 .ride-route { font-family: var(--font-display); font-size: 17px; margin: 8px 0 4px; }
@@ -99,13 +99,13 @@ h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); 
 .leaflet-container { background: var(--ocean-mid); font-family: var(--font-body); }
 .recherche-etape { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--sand-dim); }
 .recherche-etape .status-dot { background: var(--rust-bright); }
-.carte-choix { height: 260px; border-radius: 14px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--ocean-line); }
+.carte-choix { height: 260px; border-radius: 14px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--ocean-line); background: var(--ocean-mid); }
 .carte-hint { font-size: 12px; color: var(--sand-dim); text-align: center; margin: 0 0 16px; }
 .carte-hint strong { color: var(--sand); }
 </style></head>
 <body>
 <div id="app"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
@@ -305,6 +305,11 @@ function initialiserCarteChoix() {
   const el = document.getElementById("carte-choix");
   if (!el) return;
 
+  if (typeof L === "undefined") {
+    el.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:13px;color:var(--sand-dim);">Carte indisponible — vérifiez votre connexion internet, puis rechargez la page.</div>';
+    return;
+  }
+
   if (carteChoix) {
     // La carte existe déjà : si le départ n'a pas été déplacé à la main,
     // on le recentre dès que la position réelle arrive (la géolocalisation
@@ -321,11 +326,11 @@ function initialiserCarteChoix() {
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(carteChoix);
 
   const iconDepart = L.divIcon({
-    html: '<div style="background:#ff8fab;width:18px;height:18px;border-radius:50%;border:3px solid #ffffff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+    html: '<div style="background:#6ba885;width:18px;height:18px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
     className: "", iconSize: [18, 18], iconAnchor: [9, 9],
   });
   const iconDest = L.divIcon({
-    html: '<div style="background:#d6336c;width:18px;height:18px;border-radius:50%;border:3px solid #ffffff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+    html: '<div style="background:#de6339;width:18px;height:18px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
     className: "", iconSize: [18, 18], iconAnchor: [9, 9],
   });
 
@@ -603,6 +608,11 @@ function mettreAJourCarteSuivi() {
   if (carteSuivi) { carteSuivi.remove(); carteSuivi = null; }
   if (!mapEl || !state.course || state.course.statut !== "acceptee") return;
 
+  if (typeof L === "undefined") {
+    mapEl.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:13px;color:var(--sand-dim);">Carte indisponible — vérifiez votre connexion internet, puis rechargez la page.</div>';
+    return;
+  }
+
   const pos = state.chauffeurPosition;
   const pickup = state.course.pickupLat != null ? { lat: state.course.pickupLat, lng: state.course.pickupLng } : null;
   const centre = pos || pickup || KRIBI_CENTRE;
@@ -611,11 +621,11 @@ function mettreAJourCarteSuivi() {
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(carteSuivi);
 
   const iconChauffeur = L.divIcon({
-    html: '<div style="background:#d6336c;width:16px;height:16px;border-radius:50%;border:3px solid #ffffff;box-shadow:0 0 0 3px rgba(214,51,108,0.3);"></div>',
+    html: '<div style="background:#de6339;width:16px;height:16px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 0 0 3px rgba(222,99,57,0.3);"></div>',
     className: "", iconSize: [16, 16], iconAnchor: [8, 8],
   });
   const iconDepart = L.divIcon({
-    html: '<div style="background:#ff8fab;width:12px;height:12px;border-radius:50%;border:2px solid #ffffff;"></div>',
+    html: '<div style="background:#6ba885;width:12px;height:12px;border-radius:50%;border:2px solid #f1e9d8;"></div>',
     className: "", iconSize: [12, 12], iconAnchor: [6, 6],
   });
 
