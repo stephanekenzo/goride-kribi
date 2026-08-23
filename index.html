@@ -9,7 +9,6 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 
 :root {
@@ -95,17 +94,13 @@ h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); 
 .driver-row-name { display: block; font-weight: 600; font-size: 14px; }
 .driver-row-vehicule { font-size: 12px; color: var(--sand-dim); }
 .driver-row-distance { font-family: var(--font-mono); font-size: 12px; color: var(--palm-bright); }
-.carte-suivi { height: 240px; border-radius: 14px; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--ocean-line); background: var(--ocean-mid); }
-.leaflet-container { background: var(--ocean-mid); font-family: var(--font-body); }
 .recherche-etape { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--sand-dim); }
 .recherche-etape .status-dot { background: var(--rust-bright); }
-.carte-choix { height: 260px; border-radius: 14px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--ocean-line); background: var(--ocean-mid); }
-.carte-hint { font-size: 12px; color: var(--sand-dim); text-align: center; margin: 0 0 16px; }
-.carte-hint strong { color: var(--sand); }
+.chauffeur-info-card { text-align: center; }
+.chauffeur-info-card .avatar-cercle { width: 56px; height: 56px; border-radius: 50%; background: var(--palm); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-family: var(--font-display); font-size: 22px; color: var(--sand); }
 </style></head>
 <body>
 <div id="app"></div>
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
@@ -128,30 +123,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ⚠️ Clé publique Mapbox — à remplacer par la vôtre (gratuite, sans carte
-// bancaire, sur https://account.mapbox.com/access-tokens/).
-const MAPBOX_TOKEN = "VOTRE_TOKEN_MAPBOX";
-function coucheMapbox() {
-  return L.tileLayer(
-    `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
-    { attribution: "© Mapbox © OpenStreetMap", tileSize: 512, zoomOffset: -1, maxZoom: 20 }
-  );
-}
-
 const DELAI_CASCADE_MS = 40000;
-const KRIBI_CENTRE = { lat: 2.9500, lng: 9.9100 };
 
-// Trajets longue distance à tarif fixe (convention locale, indépendant
-// du point exact de départ dans Kribi).
 const ZONES_PAR_DEFAUT = [
+  { id: "ville", nom: "En ville (intra-muros)", description: "Trajet dans le centre-ville de Kribi", prix: 3000 },
+  { id: "sortie_proche", nom: "Sortie ville — proche", description: "Jusqu'au sud de la Dobé", prix: 5000 },
+  { id: "sortie_eloignee", nom: "Sortie ville — éloignée", description: "Au-delà, selon distance", prix: 10000 },
   { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", prixMin: 40000, prixMax: 45000 },
   { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", prixMin: 50000, prixMax: 60000 },
 ];
-const IDS_LONGUE_DISTANCE = ZONES_PAR_DEFAUT.map((z) => z.id);
-
-// Tarification par défaut pour les trajets en ville, calculée sur la
-// distance réelle par la route. Modifiable ensuite depuis l'admin.
-const TARIF_VILLE_PAR_DEFAUT = { prixBase: 1000, prixParKm: 500, prixMinimum: 3000 };
 
 function distanceKm(lat1, lng1, lat2, lng2) {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
@@ -166,7 +146,7 @@ function formatDistance(km) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 function formatFCFA(n) {
-  return new Intl.NumberFormat("fr-FR").format(Math.round(n)) + " FCFA";
+  return new Intl.NumberFormat("fr-FR").format(n) + " FCFA";
 }
 function prixAffiche(zone) {
   if (zone.prix) return zone.prix;
@@ -177,58 +157,26 @@ function escAttr(s) {
   return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-// Distance réelle par la route (API gratuite OSRM, sans clé). Si elle ne
-// répond pas, on retombe sur la distance à vol d'oiseau majorée de 30%
-// (approximation courante en l'absence de calcul routier).
-async function calculerDistanceRoute(depart, arrivee) {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${depart.lng},${depart.lat};${arrivee.lng},${arrivee.lat}?overview=false`;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 6000);
-    const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
-    const data = await res.json();
-    if (data.code === "Ok" && data.routes && data.routes[0]) {
-      return { km: data.routes[0].distance / 1000, estimee: false };
-    }
-    throw new Error("pas de route trouvée");
-  } catch (e) {
-    const vol = distanceKm(depart.lat, depart.lng, arrivee.lat, arrivee.lng);
-    return { km: vol * 1.3, estimee: true };
-  }
-}
-
 const state = {
   zones: ZONES_PAR_DEFAUT,
   zoneId: ZONES_PAR_DEFAUT[0].id,
-  tarifVille: TARIF_VILLE_PAR_DEFAUT,
-  typeTrajet: "ville", // ville | longue
-  pickupCoords: null, destCoords: null, departModifie: false,
-  distanceKmVille: null, prixVille: null, distanceEstimee: false, calculEnCours: false,
-  note: "", nom: "", telephone: "",
+  depart: "", destination: "", nom: "", telephone: "",
   envoi: false, erreur: "",
-  courseId: null, course: null, chauffeurPosition: null,
-  localisation: "recherche", // recherche | ok | refuse
-  chauffeursDispo: [],
+  courseId: null, course: null,
+  pickupCoords: null, localisation: "recherche", // recherche | ok | refuse
+  modeChoix: "auto", // auto | manuel
+  chauffeurCible: null, chauffeursDispo: [],
 };
 
 let unsubCourse = null;
-let unsubChauffeurPosition = null;
 let unsubChauffeursDispo = null;
-let carteSuivi = null;
-let carteChoix = null;
-let markerDepart = null, markerDest = null;
-let calculToken = 0;
 
 getDoc(doc(db, "config", "tarifs")).then((snap) => {
-  if (!snap.exists()) return;
-  const data = snap.data();
-  if (data.zones) {
-    const filtre = data.zones.filter((z) => IDS_LONGUE_DISTANCE.includes(z.id));
-    if (filtre.length > 0) { state.zones = filtre; state.zoneId = filtre[0].id; }
+  if (snap.exists() && snap.data().zones) {
+    state.zones = snap.data().zones;
+    state.zoneId = state.zones[0].id;
+    render();
   }
-  if (data.trajetUrbain) state.tarifVille = data.trajetUrbain;
-  render();
 }).catch(() => {});
 
 function zoneActuelle() {
@@ -240,6 +188,7 @@ function ecouterChauffeursDispo() {
   const q = query(collection(db, "chauffeurs"), where("statut", "==", "disponible"));
   unsubChauffeursDispo = onSnapshot(q, (snap) => {
     state.chauffeursDispo = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => c.actif !== false);
+    render();
   });
 }
 ecouterChauffeursDispo();
@@ -270,119 +219,8 @@ function localiser() {
 }
 localiser();
 
-function changerTypeTrajet(type) {
-  state.typeTrajet = type;
-  render();
-}
-
-async function recalculerPrixVille() {
-  if (!state.pickupCoords || !state.destCoords) {
-    state.distanceKmVille = null; state.prixVille = null;
-    majAffichagePrixVille();
-    return;
-  }
-  const monToken = ++calculToken;
-  state.calculEnCours = true;
-  majAffichagePrixVille();
-  const { km, estimee } = await calculerDistanceRoute(state.pickupCoords, state.destCoords);
-  if (monToken !== calculToken) return; // une saisie plus récente a pris le relais
-  state.distanceKmVille = km;
-  state.distanceEstimee = estimee;
-  state.prixVille = Math.max(state.tarifVille.prixMinimum, state.tarifVille.prixBase + km * state.tarifVille.prixParKm);
-  state.calculEnCours = false;
-  majAffichagePrixVille();
-}
-
-function majAffichagePrixVille() {
-  const montant = document.getElementById("fare-ville-montant");
-  const detail = document.getElementById("fare-ville-detail");
-  if (!montant || !detail) return;
-  if (state.calculEnCours) {
-    montant.textContent = "Calcul…";
-    detail.textContent = "";
-    return;
-  }
-  if (state.prixVille == null) {
-    montant.textContent = "—";
-    detail.textContent = "Placez les deux points sur la carte";
-    return;
-  }
-  montant.textContent = formatFCFA(state.prixVille);
-  detail.textContent = `${formatDistance(state.distanceKmVille)}${state.distanceEstimee ? " (estimation)" : " par la route"}`;
-}
-
-function initialiserCarteChoix() {
-  const el = document.getElementById("carte-choix");
-  if (!el) return;
-
-  if (typeof L === "undefined") {
-    el.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:13px;color:var(--sand-dim);">Carte indisponible — vérifiez votre connexion internet, puis rechargez la page.</div>';
-    return;
-  }
-
-  if (carteChoix) {
-    // La carte existe déjà : si le départ n'a pas été déplacé à la main,
-    // on le recentre dès que la position réelle arrive (la géolocalisation
-    // peut répondre après le premier rendu).
-    if (!state.departModifie && state.pickupCoords && markerDepart) {
-      markerDepart.setLatLng([state.pickupCoords.lat, state.pickupCoords.lng]);
-      carteChoix.setView([state.pickupCoords.lat, state.pickupCoords.lng], 15);
-    }
-    return;
-  }
-
-  const centre = state.pickupCoords || KRIBI_CENTRE;
-  carteChoix = L.map(el).setView([centre.lat, centre.lng], 14);
-  coucheMapbox().addTo(carteChoix);
-
-  const iconDepart = L.divIcon({
-    html: '<div style="background:#6ba885;width:18px;height:18px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
-    className: "", iconSize: [18, 18], iconAnchor: [9, 9],
-  });
-  const iconDest = L.divIcon({
-    html: '<div style="background:#de6339;width:18px;height:18px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
-    className: "", iconSize: [18, 18], iconAnchor: [9, 9],
-  });
-
-  markerDepart = L.marker([centre.lat, centre.lng], { icon: iconDepart, draggable: true }).addTo(carteChoix).bindPopup("Départ");
-  state.pickupCoords = { lat: centre.lat, lng: centre.lng };
-  markerDepart.on("dragend", () => {
-    const p = markerDepart.getLatLng();
-    state.pickupCoords = { lat: p.lat, lng: p.lng };
-    state.departModifie = true;
-    recalculerPrixVille();
-  });
-
-  if (state.destCoords) {
-    markerDest = L.marker([state.destCoords.lat, state.destCoords.lng], { icon: iconDest, draggable: true }).addTo(carteChoix).bindPopup("Destination");
-    markerDest.on("dragend", () => {
-      const p = markerDest.getLatLng();
-      state.destCoords = { lat: p.lat, lng: p.lng };
-      recalculerPrixVille();
-    });
-  }
-
-  carteChoix.on("click", (e) => {
-    if (!markerDest) {
-      markerDest = L.marker(e.latlng, { icon: iconDest, draggable: true }).addTo(carteChoix).bindPopup("Destination").openPopup();
-      markerDest.on("dragend", () => {
-        const p = markerDest.getLatLng();
-        state.destCoords = { lat: p.lat, lng: p.lng };
-        recalculerPrixVille();
-      });
-    } else {
-      markerDest.setLatLng(e.latlng);
-    }
-    state.destCoords = { lat: e.latlng.lat, lng: e.latlng.lng };
-    recalculerPrixVille();
-  });
-
-  if (state.destCoords) recalculerPrixVille();
-}
-
-function detruireCarteChoix() {
-  if (carteChoix) { carteChoix.remove(); carteChoix = null; markerDepart = null; markerDest = null; }
-}
+function setMode(mode) { state.modeChoix = mode; render(); }
+function choisirChauffeur(c) { state.chauffeurCible = c; render(); }
 
 function planifierCascade(courseRef, index) {
   setTimeout(async () => {
@@ -405,58 +243,43 @@ function planifierCascade(courseRef, index) {
 async function reserver(e) {
   e.preventDefault();
   state.erreur = "";
-
-  if (!state.nom.trim() || !state.telephone.trim()) {
-    state.erreur = "Merci d'indiquer votre nom et votre téléphone.";
+  if (!state.depart.trim() || !state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
+    state.erreur = "Merci de remplir tous les champs.";
     render();
     return;
   }
-  if (state.typeTrajet === "ville" && (!state.pickupCoords || !state.destCoords)) {
-    state.erreur = "Placez le départ et la destination sur la carte.";
+  if (state.modeChoix === "manuel" && !state.chauffeurCible) {
+    state.erreur = "Choisissez un chauffeur dans la liste, ou passez en mode automatique.";
     render();
     return;
   }
-
   state.envoi = true;
   render();
+  const zone = zoneActuelle();
 
-  let donnees;
-  if (state.typeTrajet === "ville") {
-    donnees = {
-      zoneId: "ville", zoneNom: "Trajet en ville",
-      depart: state.note.trim() ? `Point de départ (${state.note.trim()})` : "Point de départ (carte)",
-      destination: state.note.trim() ? `Destination (${state.note.trim()})` : "Destination (carte)",
-      tarif: state.prixVille != null ? Math.round(state.prixVille) : prixAffiche(TARIF_VILLE_PAR_DEFAUT),
-      distanceKm: state.distanceKmVille,
-      distanceEstimee: state.distanceEstimee,
-      pickupLat: state.pickupCoords.lat, pickupLng: state.pickupCoords.lng,
-      destinationLat: state.destCoords.lat, destinationLng: state.destCoords.lng,
-    };
+  let chauffeurCibleId = null;
+  let candidatsIds = [];
+  if (state.modeChoix === "manuel") {
+    chauffeurCibleId = state.chauffeurCible.id;
   } else {
-    const zone = zoneActuelle();
-    donnees = {
-      zoneId: zone.id, zoneNom: zone.nom,
-      depart: "Kribi",
-      destination: state.note.trim() || zone.nom,
-      tarif: prixAffiche(zone),
-      distanceKm: null, distanceEstimee: false,
-      pickupLat: state.pickupCoords ? state.pickupCoords.lat : null,
-      pickupLng: state.pickupCoords ? state.pickupCoords.lng : null,
-      destinationLat: null, destinationLng: null,
-    };
+    candidatsIds = chauffeursTries().map((c) => c.id);
+    chauffeurCibleId = candidatsIds.length > 0 ? candidatsIds[0] : null;
   }
-
-  const candidatsIds = state.pickupCoords ? chauffeursTries().map((c) => c.id) : [];
-  const chauffeurCibleId = candidatsIds.length > 0 ? candidatsIds[0] : null;
 
   try {
     const ref = await addDoc(collection(db, "courses"), {
-      ...donnees,
+      zoneId: zone.id,
+      zoneNom: zone.nom,
+      depart: state.depart.trim(),
+      destination: state.destination.trim(),
       clientNom: state.nom.trim(),
       clientTelephone: state.telephone.trim(),
+      tarif: prixAffiche(zone),
       statut: "en_attente",
       chauffeurId: null, chauffeurNom: null, chauffeurTelephone: null, chauffeurVehicule: null,
       chauffeurCibleId, candidatsIds, candidatIndex: 0,
+      pickupLat: state.pickupCoords ? state.pickupCoords.lat : null,
+      pickupLng: state.pickupCoords ? state.pickupCoords.lng : null,
       createdAt: serverTimestamp(),
     });
     state.courseId = ref.id;
@@ -464,17 +287,7 @@ async function reserver(e) {
 
     unsubCourse = onSnapshot(doc(db, "courses", ref.id), (snap) => {
       if (!snap.exists()) return;
-      const data = snap.data();
-      state.course = { id: snap.id, ...data };
-      if (data.statut === "acceptee" && data.chauffeurId && !unsubChauffeurPosition) {
-        unsubChauffeurPosition = onSnapshot(doc(db, "chauffeurs", data.chauffeurId), (csnap) => {
-          if (csnap.exists()) {
-            const cd = csnap.data();
-            state.chauffeurPosition = (cd.lat != null && cd.lng != null) ? { lat: cd.lat, lng: cd.lng } : null;
-            render();
-          }
-        });
-      }
+      state.course = { id: snap.id, ...snap.data() };
       render();
     });
   } catch (err) {
@@ -487,32 +300,55 @@ async function reserver(e) {
 
 function nouvelleCourse() {
   if (unsubCourse) { unsubCourse(); unsubCourse = null; }
-  if (unsubChauffeurPosition) { unsubChauffeurPosition(); unsubChauffeurPosition = null; }
-  if (carteSuivi) { carteSuivi.remove(); carteSuivi = null; }
-  detruireCarteChoix();
-  state.courseId = null; state.course = null; state.chauffeurPosition = null;
-  state.destCoords = null; state.distanceKmVille = null; state.prixVille = null; state.note = "";
+  state.courseId = null; state.course = null;
+  state.depart = ""; state.destination = ""; state.chauffeurCible = null;
   render();
 }
 
 function vueFormulaire() {
+  const zone = zoneActuelle();
+  const tarif = prixAffiche(zone);
   return `
     <p class="eyebrow">Réservation</p>
     <h1 class="title">Où allez-vous ?</h1>
+    <p class="subtitle">Choisissez votre trajet, le tarif s'affiche automatiquement.</p>
 
-    <div class="card" style="padding-bottom:14px;">
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="btn ${state.typeTrajet === "ville" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="type-trajet" data-id="ville">En ville</button>
-        <button type="button" class="btn ${state.typeTrajet === "longue" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="type-trajet" data-id="longue">Longue distance</button>
+    <div class="route-strip">
+      <div class="route-strip-line"></div>
+      <div class="route-stops">
+        ${state.zones.map((z) => `
+          <button type="button" class="route-stop ${z.id === state.zoneId ? "active" : ""}" data-action="zone" data-id="${z.id}">
+            <span class="route-stop-dot"></span>
+            <span class="route-stop-label">${z.nom}</span>
+            <span class="route-stop-price">${z.prix ? formatFCFA(z.prix) : `${formatFCFA(z.prixMin)} – ${formatFCFA(z.prixMax)}`}</span>
+          </button>
+        `).join("")}
       </div>
     </div>
 
-    ${state.typeTrajet === "ville" ? vueTrajetVille() : vueTrajetLongue()}
+    <div class="card" style="padding-bottom:14px;">
+      <label style="display:block;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--sand-dim);margin-bottom:10px;">
+        Attribution du chauffeur
+      </label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn ${state.modeChoix === "auto" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="auto">Automatique (le plus proche)</button>
+        <button type="button" class="btn ${state.modeChoix === "manuel" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="manuel">Choisir moi-même</button>
+      </div>
+      ${state.modeChoix === "auto" ? `
+        <p style="font-size:12px;color:var(--sand-dim);margin-top:12px;margin-bottom:0;">
+          ${state.pickupCoords ? "Le chauffeur disponible le plus proche est contacté en premier. S'il ne répond pas sous 40 secondes, le suivant est contacté automatiquement." : "La demande sera envoyée à tous les chauffeurs disponibles."}
+        </p>
+      ` : vueChoixChauffeur()}
+    </div>
 
     <form class="card" id="form-reservation">
       <div class="field">
-        <label for="note">Repère pour le chauffeur (optionnel)</label>
-        <input id="note" data-field="note" placeholder="Ex. Devant la pharmacie, portail bleu…" value="${escAttr(state.note)}">
+        <label for="depart">Point de départ</label>
+        <input id="depart" data-field="depart" placeholder="Ex. Rond-point Kribi centre" value="${escAttr(state.depart)}">
+      </div>
+      <div class="field">
+        <label for="destination">Destination</label>
+        <input id="destination" data-field="destination" placeholder="Ex. Hôtel Ilomba" value="${escAttr(state.destination)}">
       </div>
       <div class="field">
         <label for="nom">Votre nom</label>
@@ -522,51 +358,34 @@ function vueFormulaire() {
         <label for="telephone">Votre téléphone</label>
         <input id="telephone" data-field="telephone" placeholder="6XX XX XX XX" value="${escAttr(state.telephone)}">
       </div>
+      <div class="fare-display">
+        <span class="fare-label">${zone.nom}</span>
+        <span class="fare-amount">${zone.prix ? formatFCFA(zone.prix) : `~ ${formatFCFA(tarif)}`}</span>
+      </div>
+      ${!zone.prix ? `<p style="font-size:12px;color:var(--sand-dim);margin-top:8px;">Prix indicatif (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>` : ""}
       ${state.erreur ? `<p style="color:var(--rust-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
-      <button class="btn btn-primary" style="margin-top:20px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
-        ${state.envoi ? "Envoi en cours…" : "Réserver ce trajet"}
+      <button class="btn btn-primary" style="margin-top:16px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
+        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "manuel" && state.chauffeurCible ? `Réserver avec ${state.chauffeurCible.nom}` : "Réserver ce trajet")}
       </button>
     </form>
   `;
 }
 
-function vueTrajetVille() {
+function vueChoixChauffeur() {
+  const liste = chauffeursTries();
   return `
-    <p class="subtitle" style="margin-bottom:12px;">
-      Ajustez le point <strong style="color:var(--sand);">rose clair</strong> (départ) si besoin, puis touchez la carte pour placer votre <strong style="color:var(--sand);">destination</strong> (point rose foncé).
-    </p>
-    <div id="carte-choix" class="carte-choix"></div>
-    <div class="card">
-      <div class="fare-display" style="border-top:none;padding-top:0;margin-top:0;">
-        <span class="fare-label">Trajet en ville</span>
-        <span class="fare-amount" id="fare-ville-montant">—</span>
-      </div>
-      <p class="carte-hint" id="fare-ville-detail" style="text-align:left;margin-top:6px;">Placez les deux points sur la carte</p>
-    </div>
-  `;
-}
-
-function vueTrajetLongue() {
-  const zone = zoneActuelle();
-  return `
-    <div class="route-strip">
-      <div class="route-strip-line"></div>
-      <div class="route-stops">
-        ${state.zones.map((z) => `
-          <button type="button" class="route-stop ${z.id === state.zoneId ? "active" : ""}" data-action="zone" data-id="${z.id}">
-            <span class="route-stop-dot"></span>
-            <span class="route-stop-label">${z.nom}</span>
-            <span class="route-stop-price">${formatFCFA(z.prixMin)} – ${formatFCFA(z.prixMax)}</span>
+    <div style="margin-top:16px;">
+      ${liste.length === 0 ? `<p style="font-size:13px;color:var(--sand-dim);">Aucun chauffeur disponible pour le moment.</p>` : ""}
+      ${liste.map((c) => {
+        const d = state.pickupCoords ? distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, c.lat, c.lng) : null;
+        const selected = state.chauffeurCible && state.chauffeurCible.id === c.id;
+        return `
+          <button type="button" class="driver-row ${selected ? "selected" : ""}" data-action="choisir-chauffeur" data-id="${c.id}">
+            <span><span class="driver-row-name">${c.nom}</span><span class="driver-row-vehicule">${c.vehicule || "véhicule non renseigné"}</span></span>
+            <span class="driver-row-distance">${d != null ? formatDistance(d) : ""}</span>
           </button>
-        `).join("")}
-      </div>
-    </div>
-    <div class="card">
-      <div class="fare-display" style="border-top:none;padding-top:0;margin-top:0;">
-        <span class="fare-label">${zone.nom}</span>
-        <span class="fare-amount">~ ${formatFCFA(prixAffiche(zone))}</span>
-      </div>
-      <p class="carte-hint" style="text-align:left;margin-top:6px;">Tarif fixe (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>
+        `;
+      }).join("")}
     </div>
   `;
 }
@@ -583,25 +402,28 @@ function vueSuivi() {
         <p class="subtitle" style="margin-bottom:0;">
           ${enCascade
             ? "Le chauffeur disponible le plus proche a été contacté en premier. S'il ne répond pas, le suivant sera contacté automatiquement."
-            : "Votre demande a été envoyée aux chauffeurs disponibles."}
+            : c.chauffeurCibleId
+            ? "Votre demande a été envoyée au chauffeur choisi."
+            : "Votre demande a été envoyée à tous les chauffeurs disponibles."}
           Cette page se mettra à jour dès qu'un chauffeur accepte.
         </p>
       </div>
     `;
   }
   if (c.statut === "acceptee") {
+    const initiale = (c.chauffeurNom || "?").trim().charAt(0).toUpperCase();
     return `
       <div class="confirmation-banner">
         <p class="eyebrow">Chauffeur trouvé</p>
         <h2 style="font-family:var(--font-display);font-size:24px;margin:6px 0 0;color:var(--sand);">${c.chauffeurNom}</h2>
       </div>
-      <div id="carte-suivi" class="carte-suivi"></div>
-      <div class="card">
-        <div class="field" style="margin-bottom:12px;"><label>Véhicule</label><p style="margin:0;">${c.chauffeurVehicule || "—"}</p></div>
-        <div class="field" style="margin-bottom:0;"><label>Téléphone</label><p style="margin:0;font-family:var(--font-mono);">${c.chauffeurTelephone || "—"}</p></div>
+      <div class="card chauffeur-info-card">
+        <div class="avatar-cercle">${initiale}</div>
+        <div class="field" style="margin-bottom:12px;text-align:left;"><label>Véhicule</label><p style="margin:0;">${c.chauffeurVehicule || "—"}</p></div>
+        <div class="field" style="margin-bottom:0;text-align:left;"><label>Téléphone</label><p style="margin:0;font-family:var(--font-mono);">${c.chauffeurTelephone || "—"}</p></div>
       </div>
       <p class="ride-route">${c.depart} → ${c.destination}</p>
-      <p class="ride-price">${formatFCFA(c.tarif)}${c.distanceKm ? ` · ${formatDistance(c.distanceKm)}` : ""}</p>
+      <p class="ride-price">${formatFCFA(c.tarif)}</p>
       <button class="btn btn-secondary" style="margin-top:20px;" data-action="nouvelle-course">Nouvelle réservation</button>
     `;
   }
@@ -611,38 +433,6 @@ function vueSuivi() {
       <button class="btn btn-secondary" data-action="nouvelle-course">Nouvelle réservation</button>
     </div>
   `;
-}
-
-function mettreAJourCarteSuivi() {
-  const mapEl = document.getElementById("carte-suivi");
-  if (carteSuivi) { carteSuivi.remove(); carteSuivi = null; }
-  if (!mapEl || !state.course || state.course.statut !== "acceptee") return;
-
-  if (typeof L === "undefined") {
-    mapEl.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:13px;color:var(--sand-dim);">Carte indisponible — vérifiez votre connexion internet, puis rechargez la page.</div>';
-    return;
-  }
-
-  const pos = state.chauffeurPosition;
-  const pickup = state.course.pickupLat != null ? { lat: state.course.pickupLat, lng: state.course.pickupLng } : null;
-  const centre = pos || pickup || KRIBI_CENTRE;
-
-  carteSuivi = L.map(mapEl, { zoomControl: false }).setView([centre.lat, centre.lng], 14);
-  coucheMapbox().addTo(carteSuivi);
-
-  const iconChauffeur = L.divIcon({
-    html: '<div style="background:#de6339;width:16px;height:16px;border-radius:50%;border:3px solid #f1e9d8;box-shadow:0 0 0 3px rgba(222,99,57,0.3);"></div>',
-    className: "", iconSize: [16, 16], iconAnchor: [8, 8],
-  });
-  const iconDepart = L.divIcon({
-    html: '<div style="background:#6ba885;width:12px;height:12px;border-radius:50%;border:2px solid #f1e9d8;"></div>',
-    className: "", iconSize: [12, 12], iconAnchor: [6, 6],
-  });
-
-  const bounds = [];
-  if (pos) { L.marker([pos.lat, pos.lng], { icon: iconChauffeur }).addTo(carteSuivi).bindPopup("Chauffeur"); bounds.push([pos.lat, pos.lng]); }
-  if (pickup) { L.marker([pickup.lat, pickup.lng], { icon: iconDepart }).addTo(carteSuivi).bindPopup("Départ"); bounds.push([pickup.lat, pickup.lng]); }
-  if (bounds.length === 2) carteSuivi.fitBounds(bounds, { padding: [30, 30] });
 }
 
 function render() {
@@ -665,15 +455,6 @@ function render() {
 
   const form = document.getElementById("form-reservation");
   if (form) form.addEventListener("submit", reserver);
-
-  if (!state.courseId && state.typeTrajet === "ville") {
-    initialiserCarteChoix();
-    majAffichagePrixVille();
-  } else {
-    detruireCarteChoix();
-  }
-
-  mettreAJourCarteSuivi();
 }
 
 document.getElementById("app").addEventListener("click", (e) => {
@@ -681,7 +462,11 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (!btn) return;
   const action = btn.dataset.action;
   if (action === "zone") { state.zoneId = btn.dataset.id; render(); }
-  if (action === "type-trajet") { changerTypeTrajet(btn.dataset.id); }
+  if (action === "mode") { setMode(btn.dataset.id); }
+  if (action === "choisir-chauffeur") {
+    const c = state.chauffeursDispo.find((x) => x.id === btn.dataset.id);
+    if (c) choisirChauffeur(c);
+  }
   if (action === "nouvelle-course") { nouvelleCourse(); }
 });
 

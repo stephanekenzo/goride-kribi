@@ -124,11 +124,12 @@ const db = getFirestore(app);
 const SESSION_KEY = "goride_admin";
 
 const ZONES_PAR_DEFAUT = [
+  { id: "ville", nom: "En ville (intra-muros)", description: "Trajet dans le centre-ville de Kribi", prix: 3000 },
+  { id: "sortie_proche", nom: "Sortie ville — proche", description: "Jusqu'au sud de la Dobé", prix: 5000 },
+  { id: "sortie_eloignee", nom: "Sortie ville — éloignée", description: "Au-delà, selon distance", prix: 10000 },
   { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", prixMin: 40000, prixMax: 45000 },
   { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", prixMin: 50000, prixMax: 60000 },
 ];
-const IDS_LONGUE_DISTANCE = ZONES_PAR_DEFAUT.map((z) => z.id);
-const TARIF_VILLE_PAR_DEFAUT = { prixBase: 1000, prixParKm: 500, prixMinimum: 3000 };
 
 function formatFCFA(n) { return new Intl.NumberFormat("fr-FR").format(n) + " FCFA"; }
 function escAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
@@ -142,7 +143,7 @@ const state = {
   courses: [],
   chauffeurs: [], formOuvert: false, enEdition: null,
   fNom: "", fTelephone: "", fVehicule: "", fPin: "",
-  zones: ZONES_PAR_DEFAUT, tarifVille: TARIF_VILLE_PAR_DEFAUT, tarifsEnregistres: false,
+  zones: ZONES_PAR_DEFAUT, tarifsEnregistres: false,
 };
 
 function connecter(e) {
@@ -167,14 +168,7 @@ function demarrerEcoutes() {
     render();
   });
   getDoc(doc(db, "config", "tarifs")).then((snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-    if (data.zones) {
-      const filtre = data.zones.filter((z) => IDS_LONGUE_DISTANCE.includes(z.id));
-      if (filtre.length > 0) state.zones = filtre;
-    }
-    if (data.trajetUrbain) state.tarifVille = data.trajetUrbain;
-    render();
+    if (snap.exists() && snap.data().zones) { state.zones = snap.data().zones; render(); }
   });
 }
 
@@ -212,12 +206,8 @@ function modifierZone(index, champ, valeur) {
   state.zones = state.zones.map((z, i) => i === index ? { ...z, [champ]: Number(valeur) } : z);
   state.tarifsEnregistres = false;
 }
-function modifierTarifVille(champ, valeur) {
-  state.tarifVille = { ...state.tarifVille, [champ]: Number(valeur) };
-  state.tarifsEnregistres = false;
-}
 async function enregistrerTarifs() {
-  await setDoc(doc(db, "config", "tarifs"), { zones: state.zones, trajetUrbain: state.tarifVille });
+  await setDoc(doc(db, "config", "tarifs"), { zones: state.zones });
   state.tarifsEnregistres = true;
   render();
 }
@@ -301,32 +291,21 @@ function vueChauffeurs() {
 }
 
 function vueTarifs() {
-  let html = `
-    <div class="card">
-      <p style="font-family:var(--font-display);font-size:17px;margin:0 0 4px;">Trajets en ville</p>
-      <p style="font-size:13px;color:var(--sand-dim);margin:0 0 16px;">Calculé automatiquement selon la distance réelle par la route.</p>
-      <div class="field">
-        <label>Prix de prise en charge (FCFA)</label>
-        <input type="number" data-ville-champ="prixBase" value="${state.tarifVille.prixBase}">
-      </div>
-      <div class="field">
-        <label>Prix par kilomètre (FCFA)</label>
-        <input type="number" data-ville-champ="prixParKm" value="${state.tarifVille.prixParKm}">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>Prix minimum garanti (FCFA)</label>
-        <input type="number" data-ville-champ="prixMinimum" value="${state.tarifVille.prixMinimum}">
-      </div>
-    </div>
-  `;
-  html += state.zones.map((z, i) => `
+  let html = state.zones.map((z, i) => `
     <div class="card">
       <p style="font-family:var(--font-display);font-size:17px;margin:0 0 4px;">${z.nom}</p>
       <p style="font-size:13px;color:var(--sand-dim);margin:0 0 16px;">${z.description}</p>
-      <div style="display:flex;gap:12px;">
-        <div class="field" style="margin-bottom:0;flex:1;"><label>Prix min (FCFA)</label><input type="number" data-zone-index="${i}" data-zone-champ="prixMin" value="${z.prixMin}"></div>
-        <div class="field" style="margin-bottom:0;flex:1;"><label>Prix max (FCFA)</label><input type="number" data-zone-index="${i}" data-zone-champ="prixMax" value="${z.prixMax}"></div>
-      </div>
+      ${"prix" in z ? `
+        <div class="field" style="margin-bottom:0;">
+          <label>Prix (FCFA)</label>
+          <input type="number" data-zone-index="${i}" data-zone-champ="prix" value="${z.prix}">
+        </div>
+      ` : `
+        <div style="display:flex;gap:12px;">
+          <div class="field" style="margin-bottom:0;flex:1;"><label>Prix min (FCFA)</label><input type="number" data-zone-index="${i}" data-zone-champ="prixMin" value="${z.prixMin}"></div>
+          <div class="field" style="margin-bottom:0;flex:1;"><label>Prix max (FCFA)</label><input type="number" data-zone-index="${i}" data-zone-champ="prixMax" value="${z.prixMax}"></div>
+        </div>
+      `}
     </div>
   `).join("");
   html += `<button class="btn btn-primary" data-action="enregistrer-tarifs">Enregistrer la grille tarifaire</button>`;
@@ -368,11 +347,6 @@ function render() {
   app.querySelectorAll('[data-zone-index]').forEach((el) => {
     el.addEventListener("input", (e) => {
       modifierZone(Number(el.dataset.zoneIndex), el.dataset.zoneChamp, e.target.value);
-    });
-  });
-  app.querySelectorAll('[data-ville-champ]').forEach((el) => {
-    el.addEventListener("input", (e) => {
-      modifierTarifVille(el.dataset.villeChamp, e.target.value);
     });
   });
 
