@@ -78,27 +78,44 @@ Onglet "Tarifs" du panel admin — modifiable à tout moment.
 
 ## Comment ça marche (modèle façon Yango)
 
-- **Client** : la localisation se lance automatiquement à l'ouverture.
-  Le client choisit une zone (tarif automatique), indique sa destination,
-  son nom et son téléphone. Par défaut ("Automatique"), la demande est
-  envoyée au chauffeur disponible le plus proche ; s'il ne répond pas
-  sous 40 secondes, elle passe automatiquement au suivant, puis au
-  suivant, jusqu'à épuisement (elle est alors ouverte à tous). Le client
-  peut aussi choisir "Choisir moi-même" pour sélectionner un chauffeur
-  précis dans la liste triée par distance. Une fois la course acceptée,
-  une **carte en direct** (OpenStreetMap, sans clé API) affiche la
+- **Client** : deux types de trajet.
+  - **En ville** : une carte interactive s'ouvre, avec un point rose clair
+    (départ, positionné automatiquement puis ajustable à la main) et un
+    point rose foncé que le client place en touchant la carte
+    (destination). Le prix est calculé automatiquement sur la **distance
+    réelle par la route** (API gratuite OSRM, sans clé) : prix de prise
+    en charge + prix/km, avec un minimum garanti — tout est réglable dans
+    l'admin.
+  - **Longue distance** (Kribi-Douala, Kribi-Yaoundé) : tarif fixe comme
+    avant, pas besoin de carte.
+
+  Dans les deux cas, la demande est automatiquement envoyée au chauffeur
+  disponible le plus proche ; s'il ne répond pas sous 40 secondes, elle
+  passe au suivant, jusqu'à épuisement (elle est alors ouverte à tous).
+  Une fois la course acceptée, une **carte en direct** affiche la
   position du chauffeur qui se met à jour automatiquement.
 - **Chauffeur** : connexion téléphone + PIN. Tant qu'il est "disponible",
   sa position GPS est envoyée à Firestore toutes les ~20 secondes. Il voit
   en priorité les demandes qui lui sont directement adressées (cascade),
   puis les demandes ouvertes à tous, triées de la plus proche à la plus
-  lointaine ; alerte sonore + notification navigateur à l'arrivée d'une
-  nouvelle demande.
+  lointaine, avec la distance du trajet affichée ; alerte sonore +
+  notification navigateur à l'arrivée d'une nouvelle demande.
 - **Admin** : vue de toutes les courses (avec un bouton "Libérer à tous
   les chauffeurs" pour débloquer une demande restée bloquée sur un
-  chauffeur, par exemple si le client a fermé son navigateur avant la fin
-  de la cascade), gestion des chauffeurs (ajout, modification,
-  désactivation, suppression), grille tarifaire.
+  chauffeur), gestion des chauffeurs (ajout, modification, désactivation,
+  suppression), et grille tarifaire — les 3 paramètres du calcul en
+  ville (prise en charge, prix/km, minimum) + les 2 tarifs fixes longue
+  distance.
+
+### Calcul de distance en ville : comment ça marche
+
+Le calcul appelle l'API gratuite **OSRM** (router.project-osrm.org, sans
+clé) pour obtenir la vraie distance par la route entre les deux points
+placés sur la carte. C'est un serveur de démonstration public — gratuit
+et sans carte bancaire, mais pas garanti à 100% en disponibilité. Si
+l'appel échoue, l'application retombe automatiquement sur la distance à
+vol d'oiseau majorée de 30% (affichée comme "estimation"), pour que le
+client ait toujours un prix.
 
 ### Limite importante de la cascade automatique
 
