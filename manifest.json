@@ -1,9 +1,9 @@
 {
   "name": "GoRide Kribi",
   "short_name": "GoRide Kribi",
-  "description": "Réservez un chauffeur à Kribi",
+  "description": "Réservez un chauffeur, une moto ou un service à Kribi",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ff3d1f"
+  "background_color": "#000000",
+  "theme_color": "#000000"
 }

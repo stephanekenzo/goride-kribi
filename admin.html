@@ -4,21 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GoRide Kribi — Admin</title>
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --ocean-deep: #ffffff;
-  --ocean-mid: #f7f7f8;
-  --ocean-line: #e8e8ea;
-  --sand: #101113;
-  --sand-dim: #6b6d72;
+  --ocean-deep: #000000;
+  --ocean-mid: #17181a;
+  --ocean-line: #2c2d30;
+  --sand: #ffffff;
+  --sand-dim: #9a9ba0;
   --rust: #ff3d1f;
   --rust-bright: #ff5c3d;
-  --palm: #1fa261;
-  --palm-bright: #ff3d1f;
-  --ink: #101113;
+  --palm: #26c281;
+  --palm-bright: #ff5c3d;
+  --ink: #ffffff;
   --accent-text: #ffffff;
   --font-display: 'Fraunces', serif;
   --font-body: 'IBM Plex Sans', sans-serif;
@@ -131,6 +131,7 @@ const ZONES_PAR_DEFAUT = [
   { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", prixMin: 40000, prixMax: 45000 },
   { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", prixMin: 50000, prixMax: 60000 },
 ];
+const TARIF_KM_PAR_DEFAUT = { prixParKm: 500, prixMinimum: 1000 };
 
 function formatFCFA(n) { return new Intl.NumberFormat("fr-FR").format(n) + " FCFA"; }
 function escAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
@@ -142,9 +143,12 @@ const state = {
   loginMdp: "", loginErreur: "",
   onglet: "courses",
   courses: [],
+  demandes: [],
   chauffeurs: [], formOuvert: false, enEdition: null,
   fNom: "", fTelephone: "", fVehicule: "", fPin: "",
-  zones: ZONES_PAR_DEFAUT, tarifsEnregistres: false,
+  vehicules: [], formVehiculeOuvert: false, vehiculeEnEdition: null,
+  vNom: "", vType: "Berline", vAvecChauffeur: false, vPrixJour: "", vCaution: "", vProprietaireNom: "", vProprietaireTel: "",
+  zones: ZONES_PAR_DEFAUT, tarifKm: TARIF_KM_PAR_DEFAUT, tarifsEnregistres: false,
 };
 
 function connecter(e) {
@@ -168,8 +172,20 @@ function demarrerEcoutes() {
     state.chauffeurs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     render();
   });
+  onSnapshot(collection(db, "vehicules_location"), (snap) => {
+    state.vehicules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  });
+  onSnapshot(query(collection(db, "demandes_speciales"), orderBy("createdAt", "desc")), (snap) => {
+    state.demandes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  });
   getDoc(doc(db, "config", "tarifs")).then((snap) => {
-    if (snap.exists() && snap.data().zones) { state.zones = snap.data().zones; render(); }
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.zones) state.zones = data.zones;
+    if (data.tarifKm) state.tarifKm = data.tarifKm;
+    render();
   });
 }
 
@@ -203,12 +219,51 @@ async function basculerActif(c) { await updateDoc(doc(db, "chauffeurs", c.id), {
 async function libererCourse(c) { await updateDoc(doc(db, "courses", c.id), { chauffeurCibleId: null, candidatsIds: [] }); }
 async function supprimerChauffeur(c) { if (confirm(`Supprimer ${c.nom} ?`)) await deleteDoc(doc(db, "chauffeurs", c.id)); }
 
+// ---- Véhicules en location ----
+const TYPES_VEHICULE = ["Berline", "SUV", "Pickup 4x4", "4x4 Luxe", "Minibus"];
+function ouvrirNouveauVehicule() {
+  state.formVehiculeOuvert = true; state.vehiculeEnEdition = null;
+  state.vNom = ""; state.vType = TYPES_VEHICULE[0]; state.vAvecChauffeur = false;
+  state.vPrixJour = ""; state.vCaution = ""; state.vProprietaireNom = ""; state.vProprietaireTel = "";
+  render();
+}
+function ouvrirEditionVehicule(v) {
+  state.formVehiculeOuvert = true; state.vehiculeEnEdition = v.id;
+  state.vNom = v.nom || ""; state.vType = v.type || TYPES_VEHICULE[0]; state.vAvecChauffeur = !!v.avecChauffeur;
+  state.vPrixJour = v.prixJour || ""; state.vCaution = v.caution || ""; state.vProprietaireNom = v.proprietaireNom || ""; state.vProprietaireTel = v.proprietaireTel || "";
+  render();
+}
+function fermerFormVehicule() { state.formVehiculeOuvert = false; state.vehiculeEnEdition = null; render(); }
+function basculerAvecChauffeur() { state.vAvecChauffeur = !state.vAvecChauffeur; render(); }
+
+async function enregistrerVehicule(e) {
+  e.preventDefault();
+  if (!state.vNom.trim() || !state.vPrixJour) return;
+  const donnees = {
+    nom: state.vNom.trim(), type: state.vType, avecChauffeur: state.vAvecChauffeur,
+    prixJour: Number(state.vPrixJour), caution: Number(state.vCaution) || 0,
+    proprietaireNom: state.vProprietaireNom.trim(), proprietaireTel: state.vProprietaireTel.trim(),
+  };
+  if (state.vehiculeEnEdition) {
+    await updateDoc(doc(db, "vehicules_location", state.vehiculeEnEdition), donnees);
+  } else {
+    await addDoc(collection(db, "vehicules_location"), { ...donnees, actif: true });
+  }
+  fermerFormVehicule();
+}
+async function basculerActifVehicule(v) { await updateDoc(doc(db, "vehicules_location", v.id), { actif: !(v.actif !== false) }); }
+async function supprimerVehicule(v) { if (confirm(`Supprimer ${v.nom} ?`)) await deleteDoc(doc(db, "vehicules_location", v.id)); }
+
 function modifierZone(index, champ, valeur) {
   state.zones = state.zones.map((z, i) => i === index ? { ...z, [champ]: Number(valeur) } : z);
   state.tarifsEnregistres = false;
 }
+function modifierTarifKm(champ, valeur) {
+  state.tarifKm = { ...state.tarifKm, [champ]: Number(valeur) };
+  state.tarifsEnregistres = false;
+}
 async function enregistrerTarifs() {
-  await setDoc(doc(db, "config", "tarifs"), { zones: state.zones });
+  await setDoc(doc(db, "config", "tarifs"), { zones: state.zones, tarifKm: state.tarifKm });
   state.tarifsEnregistres = true;
   render();
 }
@@ -241,7 +296,9 @@ function vueCourses() {
   return state.courses.map((c) => `
     <div class="ride-card">
       <span class="status-pill ${statutClasse(c.statut)}"><span class="status-dot"></span> ${libelleStatut(c.statut)}</span>
+      ${c.service === "colis" ? `<span style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--sand-dim);margin-left:8px;">📦 Colis</span>` : c.typeVehicule === "moto" ? `<span style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--sand-dim);margin-left:8px;">🏍️ Moto</span>` : ""}
       <p class="ride-route">${c.depart} → ${c.destination}</p>
+      ${c.colisDescription ? `<p class="ride-meta">Colis : ${c.colisDescription}</p>` : ""}
       <p class="ride-meta">${c.clientNom} · ${c.clientTelephone}${c.chauffeurNom ? ` · Chauffeur : ${c.chauffeurNom}` : ""}${c.distanceKm ? ` · ${c.distanceKm < 1 ? Math.round(c.distanceKm * 1000) + " m" : c.distanceKm.toFixed(1) + " km"}` : ""}</p>
       <p class="ride-price">${formatFCFA(c.tarif)}</p>
       ${c.statut === "en_attente" && c.chauffeurCibleId ? `
@@ -249,6 +306,21 @@ function vueCourses() {
           Libérer à tous les chauffeurs
         </button>
       ` : ""}
+    </div>
+  `).join("");
+}
+
+function vueDemandes() {
+  if (state.demandes.length === 0) {
+    return `<div class="empty-state"><div class="empty-state-title">Aucune demande spéciale</div><p>Location, excursions et demandes restos/boutiques apparaîtront ici.</p></div>`;
+  }
+  const libelles = { location: "🔑 Location", explorer: "🧭 Explorer", partenaires: "🛍️ Restos & Boutiques" };
+  return state.demandes.map((d) => `
+    <div class="ride-card">
+      <span class="status-pill ${d.statut === "nouvelle" ? "attente" : "terminee"}"><span class="status-dot"></span> ${d.statut === "nouvelle" ? "Nouvelle" : d.statut}</span>
+      <p class="ride-route">${libelles[d.type] || d.type}</p>
+      <p class="ride-meta">${d.details}</p>
+      <p class="ride-meta">${d.clientNom} · ${d.clientTelephone}</p>
     </div>
   `).join("");
 }
@@ -291,8 +363,71 @@ function vueChauffeurs() {
   return html;
 }
 
+function vueVehicules() {
+  let html = "";
+  if (!state.formVehiculeOuvert) {
+    html += `<button class="btn btn-primary" style="margin-bottom:20px;" data-action="nouveau-vehicule">Ajouter un véhicule</button>`;
+  }
+  if (state.formVehiculeOuvert) {
+    html += `
+      <form class="card" id="form-vehicule">
+        <p style="font-family:var(--font-display);font-size:17px;margin:0 0 16px;">${state.vehiculeEnEdition ? "Modifier le véhicule" : "Nouveau véhicule"}</p>
+        <div class="field"><label>Nom</label><input data-field="vNom" placeholder="Ex. Toyota Hilux" value="${escAttr(state.vNom)}"></div>
+        <div class="field">
+          <label>Type</label>
+          <select data-field="vType" style="width:100%;background:var(--ocean-deep);border:1px solid var(--ocean-line);border-radius:10px;padding:13px 14px;color:var(--sand);font-size:15px;font-family:var(--font-body);">
+            ${TYPES_VEHICULE.map((t) => `<option value="${t}" ${state.vType === t ? "selected" : ""}>${t}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field" style="display:flex;align-items:center;justify-content:space-between;">
+          <label style="margin:0;">Avec chauffeur</label>
+          <button type="button" class="btn btn-secondary" style="width:auto;padding:6px 16px;" data-action="toggle-avec-chauffeur">${state.vAvecChauffeur ? "Oui" : "Non (clés remises)"}</button>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <div class="field" style="flex:1;"><label>Prix / jour (FCFA)</label><input type="number" data-field="vPrixJour" value="${escAttr(state.vPrixJour)}"></div>
+          <div class="field" style="flex:1;"><label>Caution (FCFA)</label><input type="number" data-field="vCaution" value="${escAttr(state.vCaution)}"></div>
+        </div>
+        <div class="field"><label>Propriétaire (optionnel)</label><input data-field="vProprietaireNom" placeholder="Nom du propriétaire" value="${escAttr(state.vProprietaireNom)}"></div>
+        <div class="field" style="margin-bottom:0;"><label>Téléphone propriétaire (optionnel)</label><input data-field="vProprietaireTel" placeholder="6XX XX XX XX" value="${escAttr(state.vProprietaireTel)}"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" data-action="annuler-vehicule">Annuler</button>
+          <button class="btn btn-primary">${state.vehiculeEnEdition ? "Mettre à jour" : "Enregistrer"}</button>
+        </div>
+      </form>
+    `;
+  }
+  if (state.vehicules.length === 0 && !state.formVehiculeOuvert) {
+    html += `<div class="empty-state"><div class="empty-state-title">Aucun véhicule enregistré</div><p>Tant qu'aucun véhicule n'est ajouté ici, l'app affiche un catalogue d'exemple (Berline, SUV, Hilux, Prado) à titre indicatif.</p></div>`;
+  }
+  html += state.vehicules.map((v) => `
+    <div class="ride-card">
+      <span class="status-pill ${v.actif === false ? "terminee" : "acceptee"}"><span class="status-dot"></span> ${v.actif === false ? "Désactivé" : "Actif"}</span>
+      <p class="ride-route">${v.nom}</p>
+      <p class="ride-meta">${v.type} · ${v.avecChauffeur ? "Avec chauffeur" : "Sans chauffeur"} · ${formatFCFA(v.prixJour)}/jour${v.caution ? ` · Caution ${formatFCFA(v.caution)}` : ""}</p>
+      ${v.proprietaireNom ? `<p class="ride-meta">Propriétaire : ${v.proprietaireNom}${v.proprietaireTel ? " · " + v.proprietaireTel : ""}</p>` : ""}
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" data-action="modifier-vehicule" data-id="${v.id}">Modifier</button>
+        <button class="btn btn-secondary" data-action="basculer-actif-vehicule" data-id="${v.id}">${v.actif === false ? "Réactiver" : "Désactiver"}</button>
+        <button class="btn btn-secondary" data-action="supprimer-vehicule" data-id="${v.id}">Supprimer</button>
+      </div>
+    </div>
+  `).join("");
+  return html;
+}
+
 function vueTarifs() {
-  let html = state.zones.map((z, i) => `
+  let html = `
+    <div class="card">
+      <p style="font-family:var(--font-display);font-size:17px;margin:0 0 4px;">Calcul automatique au kilomètre</p>
+      <p style="font-size:13px;color:var(--sand-dim);margin:0 0 16px;">Utilisé quand la position du client et la destination choisie sont connues (destinations suggérées dans l'app). La moto revient à 60% du prix voiture.</p>
+      <div style="display:flex;gap:12px;">
+        <div class="field" style="margin-bottom:0;flex:1;"><label>Prix par km (FCFA)</label><input type="number" data-km-champ="prixParKm" value="${state.tarifKm.prixParKm}"></div>
+        <div class="field" style="margin-bottom:0;flex:1;"><label>Prix minimum (FCFA)</label><input type="number" data-km-champ="prixMinimum" value="${state.tarifKm.prixMinimum}"></div>
+      </div>
+    </div>
+  `;
+  html += `<p style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--sand-dim);margin:20px 0 10px;">Tarifs de repli par zone (sans calcul automatique)</p>`;
+  html += state.zones.map((z, i) => `
     <div class="card">
       <p style="font-family:var(--font-display);font-size:17px;margin:0 0 4px;">${z.nom}</p>
       <p style="font-size:13px;color:var(--sand-dim);margin:0 0 16px;">${z.description}</p>
@@ -315,7 +450,7 @@ function vueTarifs() {
 }
 
 function vuePanel() {
-  const onglets = [["courses", "Courses"], ["chauffeurs", "Chauffeurs"], ["tarifs", "Tarifs"]];
+  const onglets = [["courses", "Courses"], ["demandes", "Demandes"], ["chauffeurs", "Chauffeurs"], ["vehicules", "Véhicules"], ["tarifs", "Tarifs"]];
   return `
     <header class="topbar">
       <div class="brand"><span class="brand-mark">Go</span>Ride</div>
@@ -332,7 +467,9 @@ function vuePanel() {
         `).join("")}
       </div>
       ${state.onglet === "courses" ? vueCourses() : ""}
+      ${state.onglet === "demandes" ? vueDemandes() : ""}
       ${state.onglet === "chauffeurs" ? vueChauffeurs() : ""}
+      ${state.onglet === "vehicules" ? vueVehicules() : ""}
       ${state.onglet === "tarifs" ? vueTarifs() : ""}
     </main>
   `;
@@ -350,11 +487,18 @@ function render() {
       modifierZone(Number(el.dataset.zoneIndex), el.dataset.zoneChamp, e.target.value);
     });
   });
+  app.querySelectorAll('[data-km-champ]').forEach((el) => {
+    el.addEventListener("input", (e) => {
+      modifierTarifKm(el.dataset.kmChamp, e.target.value);
+    });
+  });
 
   const formLogin = document.getElementById("form-login-admin");
   if (formLogin) formLogin.addEventListener("submit", connecter);
   const formChauffeur = document.getElementById("form-chauffeur");
   if (formChauffeur) formChauffeur.addEventListener("submit", enregistrerChauffeur);
+  const formVehicule = document.getElementById("form-vehicule");
+  if (formVehicule) formVehicule.addEventListener("submit", enregistrerVehicule);
 }
 
 document.getElementById("app").addEventListener("click", (e) => {
@@ -368,6 +512,12 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (action === "modifier-chauffeur") { const c = state.chauffeurs.find((x) => x.id === id); if (c) ouvrirEditionChauffeur(c); }
   if (action === "basculer-actif") { const c = state.chauffeurs.find((x) => x.id === id); if (c) basculerActif(c); }
   if (action === "supprimer-chauffeur") { const c = state.chauffeurs.find((x) => x.id === id); if (c) supprimerChauffeur(c); }
+  if (action === "nouveau-vehicule") ouvrirNouveauVehicule();
+  if (action === "annuler-vehicule") fermerFormVehicule();
+  if (action === "toggle-avec-chauffeur") basculerAvecChauffeur();
+  if (action === "modifier-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) ouvrirEditionVehicule(v); }
+  if (action === "basculer-actif-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) basculerActifVehicule(v); }
+  if (action === "supprimer-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) supprimerVehicule(v); }
   if (action === "enregistrer-tarifs") enregistrerTarifs();
   if (action === "liberer-course") { const c = state.courses.find((x) => x.id === id); if (c) libererCourse(c); }
 });

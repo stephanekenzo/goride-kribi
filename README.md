@@ -79,41 +79,80 @@ Onglet "Tarifs" du panel admin — modifiable à tout moment.
 ## Style visuel
 
 L'interface reprend les codes visuels des applications VTC connues (Uber,
-Yango) : fond blanc, accent rouge-orangé, parcours de réservation en
-écrans successifs. Le nom et le logo restent les vôtres ("GoRide
-Kribi") — aucune marque tierce n'est reproduite.
+Yango) : fond **noir**, accent rouge-orangé, écran d'accueil en grille de
+services, parcours de réservation en écrans successifs. Le nom et le
+logo restent les vôtres ("GoRide Kribi") — aucune marque tierce n'est
+reproduite.
+
+## Les services proposés (écran d'accueil)
+
+| Service | État | Ce que ça fait |
+|---|---|---|
+| 🚗 Course | Fonctionnel | Réservation de chauffeur, comme avant |
+| 🏍️ Moto | Fonctionnel | Même parcours, tarif à 60% du prix voiture |
+| 📦 Colis | Fonctionnel | Envoi de paquet, un chauffeur récupère et livre (formulaire dédié : point de récupération, livraison, description) |
+| 🧳 Voyage | Fonctionnel | Raccourci direct vers les tarifs Kribi-Douala / Kribi-Yaoundé |
+| 🔑 Location | Fonctionnel (catalogue) | Vrai catalogue de véhicules (Berline, SUV, Pickup 4x4, 4x4 Luxe...) géré dans l'admin — nom, type, prix/jour, caution, avec ou sans chauffeur, propriétaire. Le client parcourt, choisit, indique ses dates ; la demande arrive dans l'admin pour confirmation (pas de paiement ni de calendrier de disponibilité automatique pour l'instant). |
+| 🧭 Explorer | Maquette + prise de contact | Formulaire simple, demande transmise à l'admin |
+| 🛍️ Restos & Boutiques | Fonctionnel (appel + livraison) | Liste de vrais restaurants de Kribi (nom, spécialité, téléphone réel). Le client appelle pour commander, puis un bouton "Demander une livraison" ouvre directement le formulaire Colis avec le restaurant pré-rempli comme point de récupération — un chauffeur va chercher et livre. |
+
+Les demandes "Explorer" atterrissent dans l'onglet **"Demandes"** de
+l'admin. Les demandes de location apparaissent aussi là, avec le
+véhicule demandé.
+
+## Calcul du prix par la distance
+
+Quand la position du client est connue (géolocalisation) **et** que la
+destination choisie est l'une des suggestions réelles de Kribi (hôtels,
+restaurants, sites — avec coordonnées trouvées sur Google Maps), le prix
+se calcule automatiquement : **distance × prix/km**, avec un minimum
+garanti. Par défaut 500 FCFA/km — modifiable dans l'admin, onglet
+Tarifs. La moto revient à 60% de ce prix.
+
+Si la destination est tapée librement (pas dans la liste) ou si la
+position n'est pas disponible, l'app retombe sur les tarifs fixes par
+zone (comme avant), pour que la réservation marche toujours.
+
+## Le catalogue de véhicules en location
+
+Géré dans l'admin, onglet **"Véhicules"** (même principe que les
+chauffeurs : ajouter, modifier, désactiver, supprimer). Pour chaque
+véhicule : nom, type (Berline / SUV / Pickup 4x4 / 4x4 Luxe / Minibus),
+prix/jour, caution, avec ou sans chauffeur, et propriétaire (utile si
+ce ne sont pas vos propres véhicules mais ceux de partenaires qui vous
+confient leur location).
+
+Tant qu'aucun véhicule n'est ajouté dans l'admin, l'app affiche 4
+exemples par défaut (Berline 30 000, SUV 50 000, Toyota Hilux 70 000,
+Toyota Prado 100 000 FCFA/jour) — remplacez-les par votre vrai
+catalogue dès que possible.
 
 ## Comment ça marche
 
-- **Client** : parcours en 3 écrans, comme les apps VTC connues.
-  1. **Accueil** — barre "Où allons-nous ?" + destinations fréquentes de
-     Kribi en raccourcis (plage, aéroport, marché, etc. — modifiables
-     directement dans le code, tableau `SUGGESTIONS_KRIBI` en haut du
-     script de `index.html`).
-  2. **Recherche** — départ et destination en texte, avec les mêmes
-     suggestions rapides.
-  3. **Détails** — choix du trajet parmi des cartes façon "type de
-     véhicule" (tarif automatique selon la zone), puis attribution du
-     chauffeur et coordonnées du client.
+- **Client** : à partir de l'écran d'accueil (grille de services), le
+  parcours "Course"/"Moto" est en 3 écrans : Recherche (départ/
+  destination, avec les vraies destinations de Kribi en raccourcis) →
+  Détails (voiture/moto, prix calculé ou zones de repli, attribution du
+  chauffeur) → Suivi. "Colis" et les demandes spéciales ont chacun leur
+  propre formulaire court.
 
   Par défaut ("Automatique"), la demande part vers le chauffeur
   disponible le plus proche ; s'il ne répond pas sous 40 secondes, elle
   passe au suivant, jusqu'à épuisement (elle est alors ouverte à tous).
   Le client peut aussi choisir "Choisir moi-même" pour sélectionner un
-  chauffeur précis dans la liste triée par distance. Une fois la course
-  acceptée, le client voit le nom, le véhicule et le téléphone du
-  chauffeur.
+  chauffeur précis dans la liste triée par distance.
 - **Chauffeur** : connexion téléphone + PIN. Tant qu'il est "disponible",
   sa position GPS est envoyée à Firestore toutes les ~20 secondes (utilisée
   pour le tri par proximité, pas pour un affichage cartographique). Il
   voit en priorité les demandes qui lui sont directement adressées
   (cascade), puis les demandes ouvertes à tous, triées de la plus proche
-  à la plus lointaine ; alerte sonore + notification navigateur à
-  l'arrivée d'une nouvelle demande.
-- **Admin** : vue de toutes les courses (avec un bouton "Libérer à tous
-  les chauffeurs" pour débloquer une demande restée bloquée sur un
-  chauffeur), gestion des chauffeurs (ajout, modification, désactivation,
-  suppression), grille tarifaire.
+  à la plus lointaine, avec un badge Colis/Moto quand c'est le cas ;
+  alerte sonore + notification navigateur à l'arrivée d'une nouvelle
+  demande.
+- **Admin** : onglets Courses, Demandes (spéciales), Chauffeurs, Tarifs
+  (calcul au km + zones de repli). Bouton "Libérer à tous les
+  chauffeurs" pour débloquer une demande restée bloquée sur un
+  chauffeur.
 
 Cette version n'utilise volontairement **aucune carte interactive** —
 plusieurs essais (OpenStreetMap, puis Mapbox) n'ont pas donné un rendu
