@@ -76,17 +76,33 @@ Onglet "Tarifs" du panel admin — modifiable à tout moment.
 
 ---
 
+## Style visuel
+
+L'interface reprend les codes visuels des applications VTC connues (Uber,
+Yango) : fond blanc, accent rouge-orangé, parcours de réservation en
+écrans successifs. Le nom et le logo restent les vôtres ("GoRide
+Kribi") — aucune marque tierce n'est reproduite.
+
 ## Comment ça marche
 
-- **Client** : choisit une zone (tarif automatique, comme au départ),
-  remplit départ/destination/nom/téléphone en texte. Par défaut
-  ("Automatique"), la demande est envoyée au chauffeur disponible le plus
-  proche ; s'il ne répond pas sous 40 secondes, elle passe automatiquement
-  au suivant, puis au suivant, jusqu'à épuisement (elle est alors ouverte
-  à tous). Le client peut aussi choisir "Choisir moi-même" pour
-  sélectionner un chauffeur précis dans la liste triée par distance. Une
-  fois la course acceptée, le client voit le nom, le véhicule et le
-  téléphone du chauffeur.
+- **Client** : parcours en 3 écrans, comme les apps VTC connues.
+  1. **Accueil** — barre "Où allons-nous ?" + destinations fréquentes de
+     Kribi en raccourcis (plage, aéroport, marché, etc. — modifiables
+     directement dans le code, tableau `SUGGESTIONS_KRIBI` en haut du
+     script de `index.html`).
+  2. **Recherche** — départ et destination en texte, avec les mêmes
+     suggestions rapides.
+  3. **Détails** — choix du trajet parmi des cartes façon "type de
+     véhicule" (tarif automatique selon la zone), puis attribution du
+     chauffeur et coordonnées du client.
+
+  Par défaut ("Automatique"), la demande part vers le chauffeur
+  disponible le plus proche ; s'il ne répond pas sous 40 secondes, elle
+  passe au suivant, jusqu'à épuisement (elle est alors ouverte à tous).
+  Le client peut aussi choisir "Choisir moi-même" pour sélectionner un
+  chauffeur précis dans la liste triée par distance. Une fois la course
+  acceptée, le client voit le nom, le véhicule et le téléphone du
+  chauffeur.
 - **Chauffeur** : connexion téléphone + PIN. Tant qu'il est "disponible",
   sa position GPS est envoyée à Firestore toutes les ~20 secondes (utilisée
   pour le tri par proximité, pas pour un affichage cartographique). Il

@@ -5,100 +5,124 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GoRide Kribi</title>
 <meta name="description" content="Réservez un chauffeur à Kribi en quelques secondes">
-<meta name="theme-color" content="#0b3b39">
+<meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-
 :root {
-  --ocean-deep: #0b3b39;
-  --ocean-mid: #124d4a;
-  --ocean-line: #1c625d;
-  --sand: #f1e9d8;
-  --sand-dim: #d9cdb0;
-  --rust: #c1502e;
-  --rust-bright: #de6339;
-  --palm: #4c7a5e;
-  --palm-bright: #6ba885;
-  --ink: #10201c;
-  --font-display: 'Fraunces', serif;
+  --bg: #ffffff;
+  --surface: #f7f7f8;
+  --surface-alt: #fff1ee;
+  --line: #e8e8ea;
+  --accent: #ff3d1f;
+  --accent-bright: #ff5c3d;
+  --accent-dim: #ffe4dd;
+  --success: #1fa261;
+  --ink: #101113;
+  --ink-dim: #6b6d72;
+  --font-display: 'IBM Plex Sans', sans-serif;
   --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--ocean-deep); color: var(--sand); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button { font-family: var(--font-body); cursor: pointer; }
-::selection { background: var(--rust); color: var(--sand); }
-:focus-visible { outline: 2px solid var(--rust-bright); outline-offset: 2px; }
+::selection { background: var(--accent); color: #ffffff; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .page { min-height: 100dvh; display: flex; flex-direction: column; }
-.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--ocean-line); }
-.brand { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: 0.01em; display: flex; align-items: baseline; gap: 6px; }
-.brand-mark { color: var(--rust-bright); }
-.nav-link { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sand-dim); text-decoration: none; border: 1px solid var(--ocean-line); padding: 8px 12px; border-radius: 100px; transition: border-color 0.15s ease, color 0.15s ease; background: transparent; }
-.nav-link:hover { border-color: var(--rust-bright); color: var(--sand); }
-.main { flex: 1; padding: 28px 20px 60px; max-width: 560px; width: 100%; margin: 0 auto; }
-.eyebrow { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--palm-bright); margin: 0 0 8px; }
-h1.title { font-family: var(--font-display); font-size: clamp(28px, 6vw, 38px); font-weight: 600; line-height: 1.1; margin: 0 0 6px; }
-.subtitle { color: var(--sand-dim); font-size: 15px; line-height: 1.5; margin: 0 0 28px; }
-.route-strip { position: relative; padding: 4px 0 0; margin-bottom: 28px; }
-.route-strip-line { position: absolute; top: 21px; left: 14px; right: 14px; height: 2px; background: var(--ocean-line); }
-.route-stops { display: flex; gap: 0; position: relative; }
-.route-stop { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; background: transparent; border: none; padding: 0 4px; color: var(--sand-dim); }
-.route-stop-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ocean-line); background: var(--ocean-deep); transition: all 0.15s ease; }
-.route-stop.active .route-stop-dot { border-color: var(--rust-bright); background: var(--rust-bright); box-shadow: 0 0 0 4px rgba(222, 99, 57, 0.2); }
-.route-stop-label { font-size: 11px; line-height: 1.3; font-weight: 500; }
-.route-stop.active .route-stop-label { color: var(--sand); }
-.route-stop-price { font-family: var(--font-mono); font-size: 10px; color: var(--palm-bright); }
-.card { background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.brand { font-family: var(--font-display); font-size: 21px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.brand-mark { color: var(--accent); }
+.nav-link { font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); text-decoration: none; border: 1px solid var(--line); padding: 8px 12px; border-radius: 100px; background: transparent; }
+.nav-link:hover { border-color: var(--accent); color: var(--accent); }
+.back-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: #fff; font-size: 16px; color: var(--ink); }
+
+.main { flex: 1; padding: 20px 20px 60px; max-width: 560px; width: 100%; margin: 0 auto; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin: 0 0 8px; font-weight: 600; }
+h1.title { font-family: var(--font-display); font-size: clamp(26px, 6vw, 34px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 0 0 6px; }
+.subtitle { color: var(--ink-dim); font-size: 15px; line-height: 1.5; margin: 0 0 24px; }
+
+/* Barre de recherche façon Yango, sur l'écran d'accueil */
+.search-bar { display: flex; align-items: center; gap: 12px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin-bottom: 24px; text-align: left; }
+.search-bar-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.search-bar-text { display: flex; flex-direction: column; }
+.search-bar-label { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
+.search-bar-value { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.suggestion-list { margin-bottom: 24px; }
+.suggestion-row { display: flex; align-items: center; gap: 14px; width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--line); padding: 14px 4px; text-align: left; }
+.suggestion-row:last-child { border-bottom: none; }
+.suggestion-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.suggestion-text { display: flex; flex-direction: column; }
+.suggestion-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+.suggestion-meta { font-size: 12px; color: var(--ink-dim); }
+
+/* Écran de recherche (deux champs, comme la référence) */
+.search-field-group { background: var(--surface); border-radius: 16px; padding: 4px 16px; margin-bottom: 24px; }
+.search-field-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.search-field-row:last-child { border-bottom: none; }
+.search-field-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.search-field-row input { flex: 1; border: none; background: transparent; font-size: 15px; font-weight: 500; color: var(--ink); font-family: var(--font-body); }
+.search-field-row input::placeholder { color: var(--ink-dim); }
+.search-field-row input:focus { outline: none; }
+
+.vehicule-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+.vehicule-card { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 16px; text-align: left; }
+.vehicule-card.active { border-color: var(--accent); background: var(--accent-dim); }
+.vehicule-card-emoji { font-size: 26px; margin-bottom: 10px; }
+.vehicule-card-nom { font-weight: 700; font-size: 13px; color: var(--ink); margin-bottom: 2px; }
+.vehicule-card-desc { font-size: 11px; color: var(--ink-dim); margin-bottom: 8px; }
+.vehicule-card-prix { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
 .field { margin-bottom: 16px; }
-.field label { display: block; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--sand-dim); margin-bottom: 6px; }
-.field input, .field select { width: 100%; background: var(--ocean-deep); border: 1px solid var(--ocean-line); border-radius: 10px; padding: 13px 14px; color: var(--sand); font-size: 15px; font-family: var(--font-body); }
-.field input:focus, .field select:focus { border-color: var(--rust-bright); }
-.field input::placeholder { color: var(--sand-dim); opacity: 0.6; }
-.fare-display { display: flex; align-items: baseline; justify-content: space-between; padding-top: 16px; margin-top: 4px; border-top: 1px dashed var(--ocean-line); }
-.fare-label { font-size: 13px; color: var(--sand-dim); }
-.fare-amount { font-family: var(--font-mono); font-size: 26px; font-weight: 600; color: var(--rust-bright); }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 15px 20px; border-radius: 12px; border: none; font-size: 15px; font-weight: 600; font-family: var(--font-body); transition: transform 0.1s ease, opacity 0.15s ease; }
+.field label { display: block; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); margin-bottom: 6px; }
+.field input { width: 100%; background: #ffffff; border: 1px solid var(--line); border-radius: 10px; padding: 13px 14px; color: var(--ink); font-size: 15px; font-family: var(--font-body); }
+.field input:focus { border-color: var(--accent); outline: none; }
+.field input::placeholder { color: var(--ink-dim); opacity: 0.7; }
+
+.fare-display { display: flex; align-items: baseline; justify-content: space-between; padding-top: 16px; margin-top: 4px; border-top: 1px dashed var(--line); }
+.fare-label { font-size: 13px; color: var(--ink-dim); }
+.fare-amount { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--accent); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 16px 20px; border-radius: 100px; border: none; font-size: 15px; font-weight: 700; font-family: var(--font-body); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--rust); color: var(--sand); }
-.btn-primary:hover:not(:disabled) { background: var(--rust-bright); }
-.btn-secondary { background: transparent; border: 1px solid var(--ocean-line); color: var(--sand); }
-.btn-secondary:hover:not(:disabled) { border-color: var(--sand-dim); }
-.btn-ghost { background: transparent; color: var(--sand-dim); font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; border: none; }
+.btn-primary { background: var(--accent); color: #ffffff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-bright); }
+.btn-secondary { background: #ffffff; border: 1px solid var(--line); color: var(--ink); }
+.btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-ghost { background: transparent; color: var(--ink-dim); font-family: var(--font-mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; border: none; }
+
 .status-pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 10px; border-radius: 100px; }
-.status-pill.attente { background: rgba(222, 99, 57, 0.18); color: var(--rust-bright); }
-.status-pill.acceptee { background: rgba(107, 168, 133, 0.18); color: var(--palm-bright); }
-.status-pill.terminee { background: rgba(217, 205, 176, 0.15); color: var(--sand-dim); }
+.status-pill.attente { background: var(--accent-dim); color: var(--accent); }
+.status-pill.acceptee { background: rgba(31,162,97,0.12); color: var(--success); }
+.status-pill.terminee { background: var(--surface); color: var(--ink-dim); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.ride-card { background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-.ride-route { font-family: var(--font-display); font-size: 17px; margin: 8px 0 4px; }
-.ride-meta { font-size: 13px; color: var(--sand-dim); margin-bottom: 12px; }
-.ride-price { font-family: var(--font-mono); font-weight: 600; color: var(--rust-bright); }
-.empty-state { text-align: center; padding: 50px 20px; color: var(--sand-dim); }
-.empty-state-title { font-family: var(--font-display); font-size: 19px; color: var(--sand); margin-bottom: 6px; }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; }
-.toggle-switch { position: relative; width: 48px; height: 28px; border-radius: 100px; border: none; background: var(--ocean-line); transition: background 0.15s ease; }
-.toggle-switch.on { background: var(--palm); }
-.toggle-switch-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--sand); transition: transform 0.15s ease; }
-.toggle-switch.on .toggle-switch-knob { transform: translateX(20px); }
-.confirmation-banner { background: var(--palm); border-radius: 16px; padding: 24px 20px; text-align: center; margin-bottom: 20px; }
-.confirmation-banner .eyebrow { color: rgba(241, 233, 216, 0.8); }
-.table-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; }
-.stat-chip { flex-shrink: 0; background: var(--ocean-mid); border: 1px solid var(--ocean-line); border-radius: 12px; padding: 12px 16px; min-width: 90px; cursor: pointer; text-align: left; }
-.stat-chip-label { font-size: 11px; color: var(--sand-dim); }
-.driver-row { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; background: var(--ocean-deep); border: 1px solid var(--ocean-line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; color: var(--sand); }
-.driver-row.selected { background: rgba(222,99,57,0.12); border-color: var(--rust-bright); }
-.driver-row-name { display: block; font-weight: 600; font-size: 14px; }
-.driver-row-vehicule { font-size: 12px; color: var(--sand-dim); }
-.driver-row-distance { font-family: var(--font-mono); font-size: 12px; color: var(--palm-bright); }
-.recherche-etape { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--sand-dim); }
-.recherche-etape .status-dot { background: var(--rust-bright); }
+
+.ride-route { font-family: var(--font-display); font-weight: 700; font-size: 17px; margin: 8px 0 4px; }
+.ride-price { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+
+.empty-state { text-align: center; padding: 50px 20px; color: var(--ink-dim); }
+.empty-state-title { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; }
+
+.confirmation-banner { background: var(--success); border-radius: 16px; padding: 24px 20px; text-align: center; margin-bottom: 20px; }
+.confirmation-banner .eyebrow { color: rgba(255,255,255,0.85); }
 .chauffeur-info-card { text-align: center; }
-.chauffeur-info-card .avatar-cercle { width: 56px; height: 56px; border-radius: 50%; background: var(--palm); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-family: var(--font-display); font-size: 22px; color: var(--sand); }
-</style></head>
+.chauffeur-info-card .avatar-cercle { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #fff; }
+
+.driver-row { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; background: #ffffff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; color: var(--ink); }
+.driver-row.selected { background: var(--accent-dim); border-color: var(--accent); }
+.driver-row-name { display: block; font-weight: 600; font-size: 14px; }
+.driver-row-vehicule { font-size: 12px; color: var(--ink-dim); }
+.driver-row-distance { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+</style>
+</head>
 <body>
 <div id="app"></div>
 <script type="module">
@@ -126,11 +150,23 @@ const db = getFirestore(app);
 const DELAI_CASCADE_MS = 40000;
 
 const ZONES_PAR_DEFAUT = [
-  { id: "ville", nom: "En ville (intra-muros)", description: "Trajet dans le centre-ville de Kribi", prix: 3000 },
-  { id: "sortie_proche", nom: "Sortie ville — proche", description: "Jusqu'au sud de la Dobé", prix: 5000 },
-  { id: "sortie_eloignee", nom: "Sortie ville — éloignée", description: "Au-delà, selon distance", prix: 10000 },
-  { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", prixMin: 40000, prixMax: 45000 },
-  { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", prixMin: 50000, prixMax: 60000 },
+  { id: "ville", nom: "En ville", description: "Intra-muros", emoji: "🚗", prix: 3000 },
+  { id: "sortie_proche", nom: "Sortie proche", description: "Jusqu'au sud de la Dobé", emoji: "🚙", prix: 5000 },
+  { id: "sortie_eloignee", nom: "Sortie éloignée", description: "Au-delà, selon distance", emoji: "🚕", prix: 10000 },
+  { id: "kribi_douala", nom: "Kribi — Douala", description: "Trajet inter-urbain", emoji: "🚐", prixMin: 40000, prixMax: 45000 },
+  { id: "kribi_yaounde", nom: "Kribi — Yaoundé", description: "Trajet inter-urbain", emoji: "🚐", prixMin: 50000, prixMax: 60000 },
+];
+
+// Repères connus de Kribi, proposés en suggestions rapides (comme les
+// destinations fréquentes de la référence). Purement indicatif — le
+// client peut toujours taper autre chose.
+const SUGGESTIONS_KRIBI = [
+  { nom: "Plage de Kribi", meta: "Centre-ville", emoji: "🏖️" },
+  { nom: "Chutes de la Lobé", meta: "Sortie sud", emoji: "💧" },
+  { nom: "Aéroport de Kribi", meta: "Route de Campo", emoji: "✈️" },
+  { nom: "Marché central de Kribi", meta: "Centre-ville", emoji: "🛒" },
+  { nom: "Port autonome de Kribi", meta: "Mboro", emoji: "⚓" },
+  { nom: "Hôpital de District de Kribi", meta: "Centre-ville", emoji: "🏥" },
 ];
 
 function distanceKm(lat1, lng1, lat2, lng2) {
@@ -158,9 +194,10 @@ function escAttr(s) {
 }
 
 const state = {
+  ecran: "accueil", // accueil | recherche | details
   zones: ZONES_PAR_DEFAUT,
   zoneId: ZONES_PAR_DEFAUT[0].id,
-  depart: "", destination: "", nom: "", telephone: "",
+  depart: "Ma position actuelle", destination: "", nom: "", telephone: "",
   envoi: false, erreur: "",
   courseId: null, course: null,
   pickupCoords: null, localisation: "recherche", // recherche | ok | refuse
@@ -205,20 +242,21 @@ function chauffeursTries() {
 }
 
 function localiser() {
-  if (!navigator.geolocation) { state.localisation = "refuse"; render(); return; }
-  state.localisation = "recherche";
+  if (!navigator.geolocation) { state.localisation = "refuse"; return; }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       state.pickupCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       state.localisation = "ok";
       render();
     },
-    () => { state.localisation = "refuse"; render(); },
+    () => { state.localisation = "refuse"; },
     { enableHighAccuracy: true, timeout: 10000 }
   );
 }
 localiser();
 
+function allerA(ecran) { state.ecran = ecran; state.erreur = ""; render(); }
+function choisirSuggestion(nom) { state.destination = nom; allerA("details"); }
 function setMode(mode) { state.modeChoix = mode; render(); }
 function choisirChauffeur(c) { state.chauffeurCible = c; render(); }
 
@@ -243,7 +281,7 @@ function planifierCascade(courseRef, index) {
 async function reserver(e) {
   e.preventDefault();
   state.erreur = "";
-  if (!state.depart.trim() || !state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
+  if (!state.destination.trim() || !state.nom.trim() || !state.telephone.trim()) {
     state.erreur = "Merci de remplir tous les champs.";
     render();
     return;
@@ -270,7 +308,7 @@ async function reserver(e) {
     const ref = await addDoc(collection(db, "courses"), {
       zoneId: zone.id,
       zoneNom: zone.nom,
-      depart: state.depart.trim(),
+      depart: state.depart.trim() || "Ma position actuelle",
       destination: state.destination.trim(),
       clientNom: state.nom.trim(),
       clientTelephone: state.telephone.trim(),
@@ -301,55 +339,110 @@ async function reserver(e) {
 function nouvelleCourse() {
   if (unsubCourse) { unsubCourse(); unsubCourse = null; }
   state.courseId = null; state.course = null;
-  state.depart = ""; state.destination = ""; state.chauffeurCible = null;
+  state.destination = ""; state.chauffeurCible = null;
+  state.ecran = "accueil";
   render();
 }
 
-function vueFormulaire() {
+// ---------- Écrans ----------
+
+function vueAccueil() {
+  return `
+    <p class="eyebrow">Bonjour</p>
+    <h1 class="title">Où allons-nous ?</h1>
+    <button type="button" class="search-bar" data-action="ecran" data-id="recherche">
+      <span class="search-bar-icon">🔍</span>
+      <span class="search-bar-text">
+        <span class="search-bar-label">Destination</span>
+        <span class="search-bar-value">Entrer une adresse à Kribi</span>
+      </span>
+    </button>
+    <p class="eyebrow">Destinations fréquentes</p>
+    <div class="suggestion-list">
+      ${SUGGESTIONS_KRIBI.map((s) => `
+        <button type="button" class="suggestion-row" data-action="suggestion" data-nom="${escAttr(s.nom)}">
+          <span class="suggestion-icon">${s.emoji}</span>
+          <span class="suggestion-text">
+            <span class="suggestion-name">${s.nom}</span>
+            <span class="suggestion-meta">${s.meta}</span>
+          </span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function vueRecherche() {
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="accueil">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">Votre trajet</h1>
+    </div>
+    <div class="search-field-group">
+      <div class="search-field-row">
+        <span class="search-field-dot" style="background:var(--success);"></span>
+        <input data-field="depart" placeholder="Point de départ" value="${escAttr(state.depart)}">
+      </div>
+      <div class="search-field-row">
+        <span class="search-field-dot" style="background:var(--accent);"></span>
+        <input id="champ-destination" data-field="destination" placeholder="Où allez-vous ?" value="${escAttr(state.destination)}">
+      </div>
+    </div>
+    <p class="eyebrow">Suggestions</p>
+    <div class="suggestion-list">
+      ${SUGGESTIONS_KRIBI.map((s) => `
+        <button type="button" class="suggestion-row" data-action="suggestion" data-nom="${escAttr(s.nom)}">
+          <span class="suggestion-icon">${s.emoji}</span>
+          <span class="suggestion-text">
+            <span class="suggestion-name">${s.nom}</span>
+            <span class="suggestion-meta">${s.meta}</span>
+          </span>
+        </button>
+      `).join("")}
+    </div>
+    <button type="button" class="btn btn-primary" data-action="valider-recherche" ${!state.destination.trim() ? "disabled" : ""}>
+      Continuer
+    </button>
+  `;
+}
+
+function vueDetails() {
   const zone = zoneActuelle();
   const tarif = prixAffiche(zone);
   return `
-    <p class="eyebrow">Réservation</p>
-    <h1 class="title">Où allez-vous ?</h1>
-    <p class="subtitle">Choisissez votre trajet, le tarif s'affiche automatiquement.</p>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="recherche">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">Choisissez votre trajet</h1>
+    </div>
+    <p class="subtitle" style="margin-bottom:16px;">${state.depart} → <strong style="color:var(--ink);">${state.destination}</strong></p>
 
-    <div class="route-strip">
-      <div class="route-strip-line"></div>
-      <div class="route-stops">
-        ${state.zones.map((z) => `
-          <button type="button" class="route-stop ${z.id === state.zoneId ? "active" : ""}" data-action="zone" data-id="${z.id}">
-            <span class="route-stop-dot"></span>
-            <span class="route-stop-label">${z.nom}</span>
-            <span class="route-stop-price">${z.prix ? formatFCFA(z.prix) : `${formatFCFA(z.prixMin)} – ${formatFCFA(z.prixMax)}`}</span>
-          </button>
-        `).join("")}
-      </div>
+    <div class="vehicule-grid">
+      ${state.zones.map((z) => `
+        <button type="button" class="vehicule-card ${z.id === state.zoneId ? "active" : ""}" data-action="zone" data-id="${z.id}">
+          <div class="vehicule-card-emoji">${z.emoji || "🚗"}</div>
+          <div class="vehicule-card-nom">${z.nom}</div>
+          <div class="vehicule-card-desc">${z.description || ""}</div>
+          <div class="vehicule-card-prix">${z.prix ? formatFCFA(z.prix) : `${formatFCFA(z.prixMin)}–${formatFCFA(z.prixMax)}`}</div>
+        </button>
+      `).join("")}
     </div>
 
     <div class="card" style="padding-bottom:14px;">
-      <label style="display:block;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--sand-dim);margin-bottom:10px;">
+      <label style="display:block;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin-bottom:10px;">
         Attribution du chauffeur
       </label>
       <div style="display:flex;gap:8px;">
-        <button type="button" class="btn ${state.modeChoix === "auto" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="auto">Automatique (le plus proche)</button>
+        <button type="button" class="btn ${state.modeChoix === "auto" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="auto">Automatique</button>
         <button type="button" class="btn ${state.modeChoix === "manuel" ? "btn-primary" : "btn-secondary"}" style="flex:1;font-size:13px;padding:10px 8px;" data-action="mode" data-id="manuel">Choisir moi-même</button>
       </div>
       ${state.modeChoix === "auto" ? `
-        <p style="font-size:12px;color:var(--sand-dim);margin-top:12px;margin-bottom:0;">
-          ${state.pickupCoords ? "Le chauffeur disponible le plus proche est contacté en premier. S'il ne répond pas sous 40 secondes, le suivant est contacté automatiquement." : "La demande sera envoyée à tous les chauffeurs disponibles."}
+        <p style="font-size:12px;color:var(--ink-dim);margin-top:12px;margin-bottom:0;">
+          Le chauffeur disponible le plus proche est contacté en premier. S'il ne répond pas sous 40 secondes, le suivant est contacté automatiquement.
         </p>
       ` : vueChoixChauffeur()}
     </div>
 
     <form class="card" id="form-reservation">
-      <div class="field">
-        <label for="depart">Point de départ</label>
-        <input id="depart" data-field="depart" placeholder="Ex. Rond-point Kribi centre" value="${escAttr(state.depart)}">
-      </div>
-      <div class="field">
-        <label for="destination">Destination</label>
-        <input id="destination" data-field="destination" placeholder="Ex. Hôtel Ilomba" value="${escAttr(state.destination)}">
-      </div>
       <div class="field">
         <label for="nom">Votre nom</label>
         <input id="nom" data-field="nom" placeholder="Nom et prénom" value="${escAttr(state.nom)}">
@@ -362,10 +455,10 @@ function vueFormulaire() {
         <span class="fare-label">${zone.nom}</span>
         <span class="fare-amount">${zone.prix ? formatFCFA(zone.prix) : `~ ${formatFCFA(tarif)}`}</span>
       </div>
-      ${!zone.prix ? `<p style="font-size:12px;color:var(--sand-dim);margin-top:8px;">Prix indicatif (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>` : ""}
-      ${state.erreur ? `<p style="color:var(--rust-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
+      ${!zone.prix ? `<p style="font-size:12px;color:var(--ink-dim);margin-top:8px;">Prix indicatif (${formatFCFA(zone.prixMin)} – ${formatFCFA(zone.prixMax)}), confirmé avec le chauffeur.</p>` : ""}
+      ${state.erreur ? `<p style="color:var(--accent);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
       <button class="btn btn-primary" style="margin-top:16px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
-        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "manuel" && state.chauffeurCible ? `Réserver avec ${state.chauffeurCible.nom}` : "Réserver ce trajet")}
+        ${state.envoi ? "Envoi en cours…" : (state.modeChoix === "manuel" && state.chauffeurCible ? `Commander avec ${state.chauffeurCible.nom}` : "Commander une course")}
       </button>
     </form>
   `;
@@ -375,7 +468,7 @@ function vueChoixChauffeur() {
   const liste = chauffeursTries();
   return `
     <div style="margin-top:16px;">
-      ${liste.length === 0 ? `<p style="font-size:13px;color:var(--sand-dim);">Aucun chauffeur disponible pour le moment.</p>` : ""}
+      ${liste.length === 0 ? `<p style="font-size:13px;color:var(--ink-dim);">Aucun chauffeur disponible pour le moment.</p>` : ""}
       ${liste.map((c) => {
         const d = state.pickupCoords ? distanceKm(state.pickupCoords.lat, state.pickupCoords.lng, c.lat, c.lng) : null;
         const selected = state.chauffeurCible && state.chauffeurCible.id === c.id;
@@ -398,7 +491,7 @@ function vueSuivi() {
     return `
       <div class="card" style="text-align:center;padding:32px 20px;">
         <span class="status-pill attente"><span class="status-dot"></span> En attente</span>
-        <h2 style="font-family:var(--font-display);font-size:22px;margin:16px 0 8px;">Recherche d'un chauffeur…</h2>
+        <h2 style="font-family:var(--font-display);font-weight:800;font-size:22px;margin:16px 0 8px;">Recherche d'un chauffeur…</h2>
         <p class="subtitle" style="margin-bottom:0;">
           ${enCascade
             ? "Le chauffeur disponible le plus proche a été contacté en premier. S'il ne répond pas, le suivant sera contacté automatiquement."
@@ -415,7 +508,7 @@ function vueSuivi() {
     return `
       <div class="confirmation-banner">
         <p class="eyebrow">Chauffeur trouvé</p>
-        <h2 style="font-family:var(--font-display);font-size:24px;margin:6px 0 0;color:var(--sand);">${c.chauffeurNom}</h2>
+        <h2 style="font-family:var(--font-display);font-weight:800;font-size:24px;margin:6px 0 0;color:#fff;">${c.chauffeurNom}</h2>
       </div>
       <div class="card chauffeur-info-card">
         <div class="avatar-cercle">${initiale}</div>
@@ -437,30 +530,46 @@ function vueSuivi() {
 
 function render() {
   const app = document.getElementById("app");
+  let contenu;
+  if (state.courseId) contenu = vueSuivi();
+  else if (state.ecran === "recherche") contenu = vueRecherche();
+  else if (state.ecran === "details") contenu = vueDetails();
+  else contenu = vueAccueil();
+
   app.innerHTML = `
     <div class="page">
       <header class="topbar">
         <div class="brand"><span class="brand-mark">Go</span>Ride Kribi</div>
         <a href="chauffeur.html" class="nav-link">Espace chauffeur</a>
       </header>
-      <main class="main">
-        ${state.courseId ? vueSuivi() : vueFormulaire()}
-      </main>
+      <main class="main">${contenu}</main>
     </div>
   `;
 
   app.querySelectorAll('[data-field]').forEach((el) => {
-    el.addEventListener("input", (e) => { state[el.dataset.field] = e.target.value; });
+    el.addEventListener("input", (e) => {
+      state[el.dataset.field] = e.target.value;
+      if (el.dataset.field === "destination" && state.ecran === "recherche") {
+        const btn = document.querySelector('[data-action="valider-recherche"]');
+        if (btn) btn.disabled = !state.destination.trim();
+      }
+    });
   });
 
   const form = document.getElementById("form-reservation");
   if (form) form.addEventListener("submit", reserver);
+
+  const champDest = document.getElementById("champ-destination");
+  if (champDest && state.ecran === "recherche" && !state.destination) champDest.focus();
 }
 
 document.getElementById("app").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const action = btn.dataset.action;
+  if (action === "ecran") { allerA(btn.dataset.id); }
+  if (action === "suggestion") { choisirSuggestion(btn.dataset.nom); }
+  if (action === "valider-recherche") { if (state.destination.trim()) allerA("details"); }
   if (action === "zone") { state.zoneId = btn.dataset.id; render(); }
   if (action === "mode") { setMode(btn.dataset.id); }
   if (action === "choisir-chauffeur") {
