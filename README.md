@@ -113,6 +113,30 @@ Si la destination est tapée librement (pas dans la liste) ou si la
 position n'est pas disponible, l'app retombe sur les tarifs fixes par
 zone (comme avant), pour que la réservation marche toujours.
 
+## Le menu Compte
+
+Un avatar (emoji) en haut à droite de l'écran client ouvre le menu
+Compte, façon Yango. Comme l'app n'a pas de vrai système de connexion,
+le profil est conservé **sur l'appareil** (localStorage) — pas de mot
+de passe, pas de synchronisation entre appareils.
+
+- **Historique** — courses passées, retrouvées via le numéro de
+  téléphone renseigné dans Paramètres (recherche dans Firestore).
+- **Adresses** — lieux favoris (Domicile, Travail...) enregistrés
+  localement, réutilisables comme raccourcis dans l'écran de recherche
+  de destination.
+- **Assistance** — numéro à appeler en un tap. ⚠️ **À faire** : remplacer
+  le numéro placeholder `ASSISTANCE_TEL` (tout en haut du script de
+  `index.html`) par votre vrai numéro.
+- **Paramètres** — nom, téléphone, avatar (choix parmi une dizaine
+  d'emojis ; pas de vraie photo, aucun stockage d'image n'est
+  configuré).
+- **Réductions** — le client saisit un code promo, vérifié contre
+  Firestore ; s'il est valide, la réduction s'applique automatiquement
+  sur les courses, colis et voyages tant que le code reste actif sur
+  l'appareil. Les codes se créent dans l'admin, onglet **"Codes
+  promo"** (pourcentage ou montant fixe, activable/désactivable).
+
 ## Le catalogue de véhicules en location
 
 Géré dans l'admin, onglet **"Véhicules"** (même principe que les

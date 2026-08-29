@@ -40,5 +40,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // Codes promo : lecture publique (vérification côté client),
+    // écriture réservée à l'admin.
+    match /codes_promo/{promoId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

@@ -148,6 +148,8 @@ const state = {
   fNom: "", fTelephone: "", fVehicule: "", fPin: "",
   vehicules: [], formVehiculeOuvert: false, vehiculeEnEdition: null,
   vNom: "", vType: "Berline", vAvecChauffeur: false, vPrixJour: "", vCaution: "", vProprietaireNom: "", vProprietaireTel: "",
+  codesPromo: [], formPromoOuvert: false, promoEnEdition: null,
+  pCode: "", pType: "pourcentage", pValeur: "",
   zones: ZONES_PAR_DEFAUT, tarifKm: TARIF_KM_PAR_DEFAUT, tarifsEnregistres: false,
 };
 
@@ -174,6 +176,10 @@ function demarrerEcoutes() {
   });
   onSnapshot(collection(db, "vehicules_location"), (snap) => {
     state.vehicules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  });
+  onSnapshot(collection(db, "codes_promo"), (snap) => {
+    state.codesPromo = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     render();
   });
   onSnapshot(query(collection(db, "demandes_speciales"), orderBy("createdAt", "desc")), (snap) => {
@@ -253,6 +259,33 @@ async function enregistrerVehicule(e) {
 }
 async function basculerActifVehicule(v) { await updateDoc(doc(db, "vehicules_location", v.id), { actif: !(v.actif !== false) }); }
 async function supprimerVehicule(v) { if (confirm(`Supprimer ${v.nom} ?`)) await deleteDoc(doc(db, "vehicules_location", v.id)); }
+
+// ---- Codes promo ----
+function ouvrirNouveauPromo() {
+  state.formPromoOuvert = true; state.promoEnEdition = null;
+  state.pCode = ""; state.pType = "pourcentage"; state.pValeur = "";
+  render();
+}
+function ouvrirEditionPromo(p) {
+  state.formPromoOuvert = true; state.promoEnEdition = p.id;
+  state.pCode = p.code || ""; state.pType = p.type || "pourcentage"; state.pValeur = p.valeur || "";
+  render();
+}
+function fermerFormPromo() { state.formPromoOuvert = false; state.promoEnEdition = null; render(); }
+
+async function enregistrerPromo(e) {
+  e.preventDefault();
+  if (!state.pCode.trim() || !state.pValeur) return;
+  const donnees = { code: state.pCode.trim().toUpperCase(), type: state.pType, valeur: Number(state.pValeur) };
+  if (state.promoEnEdition) {
+    await updateDoc(doc(db, "codes_promo", state.promoEnEdition), donnees);
+  } else {
+    await addDoc(collection(db, "codes_promo"), { ...donnees, actif: true });
+  }
+  fermerFormPromo();
+}
+async function basculerActifPromo(p) { await updateDoc(doc(db, "codes_promo", p.id), { actif: !(p.actif !== false) }); }
+async function supprimerPromo(p) { if (confirm(`Supprimer le code ${p.code} ?`)) await deleteDoc(doc(db, "codes_promo", p.id)); }
 
 function modifierZone(index, champ, valeur) {
   state.zones = state.zones.map((z, i) => i === index ? { ...z, [champ]: Number(valeur) } : z);
@@ -415,6 +448,49 @@ function vueVehicules() {
   return html;
 }
 
+function vueCodesPromo() {
+  let html = "";
+  if (!state.formPromoOuvert) {
+    html += `<button class="btn btn-primary" style="margin-bottom:20px;" data-action="nouveau-promo">Ajouter un code promo</button>`;
+  }
+  if (state.formPromoOuvert) {
+    html += `
+      <form class="card" id="form-promo-admin">
+        <p style="font-family:var(--font-display);font-size:17px;margin:0 0 16px;">${state.promoEnEdition ? "Modifier le code" : "Nouveau code promo"}</p>
+        <div class="field"><label>Code</label><input data-field="pCode" placeholder="Ex. BIENVENUE" value="${escAttr(state.pCode)}" style="text-transform:uppercase;"></div>
+        <div class="field">
+          <label>Type de réduction</label>
+          <select data-field="pType" style="width:100%;background:var(--ocean-deep);border:1px solid var(--ocean-line);border-radius:10px;padding:13px 14px;color:var(--sand);font-size:15px;font-family:var(--font-body);">
+            <option value="pourcentage" ${state.pType === "pourcentage" ? "selected" : ""}>Pourcentage (%)</option>
+            <option value="montant" ${state.pType === "montant" ? "selected" : ""}>Montant fixe (FCFA)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Valeur</label><input type="number" data-field="pValeur" placeholder="${state.pType === "pourcentage" ? "Ex. 10" : "Ex. 1000"}" value="${escAttr(state.pValeur)}"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button type="button" class="btn btn-secondary" data-action="annuler-promo">Annuler</button>
+          <button class="btn btn-primary">${state.promoEnEdition ? "Mettre à jour" : "Enregistrer"}</button>
+        </div>
+      </form>
+    `;
+  }
+  if (state.codesPromo.length === 0 && !state.formPromoOuvert) {
+    html += `<div class="empty-state"><div class="empty-state-title">Aucun code promo</div><p>Créez un code pour l'onglet "Réductions" côté client.</p></div>`;
+  }
+  html += state.codesPromo.map((p) => `
+    <div class="ride-card">
+      <span class="status-pill ${p.actif === false ? "terminee" : "acceptee"}"><span class="status-dot"></span> ${p.actif === false ? "Désactivé" : "Actif"}</span>
+      <p class="ride-route">${p.code}</p>
+      <p class="ride-meta">${p.type === "pourcentage" ? `-${p.valeur}%` : `-${formatFCFA(p.valeur)}`}</p>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" data-action="modifier-promo" data-id="${p.id}">Modifier</button>
+        <button class="btn btn-secondary" data-action="basculer-actif-promo" data-id="${p.id}">${p.actif === false ? "Réactiver" : "Désactiver"}</button>
+        <button class="btn btn-secondary" data-action="supprimer-promo" data-id="${p.id}">Supprimer</button>
+      </div>
+    </div>
+  `).join("");
+  return html;
+}
+
 function vueTarifs() {
   let html = `
     <div class="card">
@@ -450,7 +526,7 @@ function vueTarifs() {
 }
 
 function vuePanel() {
-  const onglets = [["courses", "Courses"], ["demandes", "Demandes"], ["chauffeurs", "Chauffeurs"], ["vehicules", "Véhicules"], ["tarifs", "Tarifs"]];
+  const onglets = [["courses", "Courses"], ["demandes", "Demandes"], ["chauffeurs", "Chauffeurs"], ["vehicules", "Véhicules"], ["promos", "Codes promo"], ["tarifs", "Tarifs"]];
   return `
     <header class="topbar">
       <div class="brand"><span class="brand-mark">Go</span>Ride</div>
@@ -470,6 +546,7 @@ function vuePanel() {
       ${state.onglet === "demandes" ? vueDemandes() : ""}
       ${state.onglet === "chauffeurs" ? vueChauffeurs() : ""}
       ${state.onglet === "vehicules" ? vueVehicules() : ""}
+      ${state.onglet === "promos" ? vueCodesPromo() : ""}
       ${state.onglet === "tarifs" ? vueTarifs() : ""}
     </main>
   `;
@@ -499,6 +576,8 @@ function render() {
   if (formChauffeur) formChauffeur.addEventListener("submit", enregistrerChauffeur);
   const formVehicule = document.getElementById("form-vehicule");
   if (formVehicule) formVehicule.addEventListener("submit", enregistrerVehicule);
+  const formPromoAdmin = document.getElementById("form-promo-admin");
+  if (formPromoAdmin) formPromoAdmin.addEventListener("submit", enregistrerPromo);
 }
 
 document.getElementById("app").addEventListener("click", (e) => {
@@ -518,6 +597,11 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (action === "modifier-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) ouvrirEditionVehicule(v); }
   if (action === "basculer-actif-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) basculerActifVehicule(v); }
   if (action === "supprimer-vehicule") { const v = state.vehicules.find((x) => x.id === id); if (v) supprimerVehicule(v); }
+  if (action === "nouveau-promo") ouvrirNouveauPromo();
+  if (action === "annuler-promo") fermerFormPromo();
+  if (action === "modifier-promo") { const p = state.codesPromo.find((x) => x.id === id); if (p) ouvrirEditionPromo(p); }
+  if (action === "basculer-actif-promo") { const p = state.codesPromo.find((x) => x.id === id); if (p) basculerActifPromo(p); }
+  if (action === "supprimer-promo") { const p = state.codesPromo.find((x) => x.id === id); if (p) supprimerPromo(p); }
   if (action === "enregistrer-tarifs") enregistrerTarifs();
   if (action === "liberer-course") { const c = state.courses.find((x) => x.id === id); if (c) libererCourse(c); }
 });

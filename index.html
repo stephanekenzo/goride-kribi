@@ -140,6 +140,24 @@ h1.title { font-family: var(--font-display); font-size: clamp(24px, 6vw, 32px); 
 .catalogue-card-meta { font-size: 12px; color: var(--dim); }
 .catalogue-card-prix { font-family: var(--font-mono); font-weight: 700; font-size: 14px; color: var(--accent-bright); white-space: nowrap; }
 .tag-chip { display: inline-block; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface-alt); color: var(--dim); padding: 3px 8px; border-radius: 100px; margin-top: 4px; }
+
+.avatar-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.compte-avatar { width: 96px; height: 96px; border-radius: 50%; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; font-size: 44px; margin: 0 auto 14px; }
+.compte-nom { text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 22px; margin: 0; }
+.compte-tel { text-align: center; color: var(--dim); font-size: 14px; margin: 4px 0 24px; }
+.icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px; }
+.icon-grid-item { display: flex; flex-direction: column; align-items: center; gap: 8px; background: transparent; border: none; }
+.icon-grid-circle { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.icon-grid-label { font-size: 11px; color: var(--white); text-align: center; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; text-align: left; }
+.menu-row-text { display: flex; align-items: center; gap: 14px; }
+.menu-row-emoji { font-size: 20px; }
+.menu-row-nom { font-weight: 600; font-size: 15px; }
+.menu-row-desc { font-size: 12px; color: var(--dim); }
+.avatar-picker { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.avatar-option { width: 48px; height: 48px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.avatar-option.active { border-color: var(--accent); }
+.avatar-picker button { padding: 0; }
 </style>
 </head>
 <body>
@@ -147,7 +165,7 @@ h1.title { font-family: var(--font-display); font-size: clamp(24px, 6vw, 32px); 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, doc, onSnapshot, getDoc,
+  getFirestore, collection, addDoc, doc, onSnapshot, getDoc, getDocs,
   serverTimestamp, query, where, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
@@ -237,6 +255,20 @@ const SERVICES_ACCUEIL = [
   { id: "partenaires", emoji: "🛍️", nom: "Restos & Boutiques", desc: "Commander puis livrer" },
 ];
 
+// ⚠️ Numéro d'assistance GoRide Kribi — à remplacer par le vôtre.
+const ASSISTANCE_TEL = "+237 6XX XX XX XX";
+
+const AVATARS_DISPONIBLES = ["🙂", "😎", "🐰", "🐯", "🦁", "🐸", "🐼", "🦊", "🐨", "🐵"];
+
+// ---- Petit "compte" local (sans vrai système d'authentification) :
+// profil, adresses et code promo sont conservés sur cet appareil.
+function lireLocal(cle, defaut) {
+  try { const v = localStorage.getItem(cle); return v ? JSON.parse(v) : defaut; } catch (e) { return defaut; }
+}
+function ecrireLocal(cle, valeur) {
+  try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch (e) {}
+}
+
 function distanceKm(lat1, lng1, lat2, lng2) {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
   const R = 6371;
@@ -263,6 +295,14 @@ function escAttr(s) {
 function arrondi100(n) {
   return Math.round(n / 100) * 100;
 }
+function appliquerPromo(prix) {
+  const p = state.promo;
+  if (!p) return prix;
+  const reduit = p.type === "pourcentage" ? prix * (1 - p.valeur / 100) : prix - p.valeur;
+  return Math.max(0, arrondi100(reduit));
+}
+
+const profilInitial = lireLocal("goride_profil", { nom: "", telephone: "", avatar: "🙂" });
 
 const state = {
   ecran: "accueil", // accueil | recherche | details | colis | special | suivi-special
@@ -272,7 +312,7 @@ const state = {
   zoneId: ZONES_PAR_DEFAUT[0].id,
   tarifKm: TARIF_KM_PAR_DEFAUT,
   depart: "Ma position actuelle", destination: "", destCoords: null,
-  nom: "", telephone: "",
+  nom: profilInitial.nom, telephone: profilInitial.telephone,
   envoi: false, erreur: "",
   courseId: null, course: null,
   pickupCoords: null, localisation: "recherche",
@@ -286,6 +326,14 @@ const state = {
   vehiculeChoisi: null, locationDates: "", locationEnvoyee: false,
   // restaurants
   restoChoisi: null,
+  // compte
+  avatar: profilInitial.avatar || "🙂",
+  adresses: lireLocal("goride_adresses", []),
+  adresseLabel: "", adresseTexte: "",
+  historique: [], historiqueCharge: false,
+  promo: lireLocal("goride_promo", null),
+  promoSaisie: "", promoErreur: "", promoVerif: false,
+  origineEcran: "accueil", // pour "retour" depuis les sous-écrans du compte
 };
 
 let unsubCourse = null;
@@ -440,10 +488,14 @@ function planifierCascade(courseRef, index) {
 
 function prixCourseActuel() {
   const t = trajetCalcule();
-  if (t) return state.typeVehicule === "moto" ? t.prixMoto : t.prixVoiture;
-  const zone = zoneActuelle();
-  const base = prixAffiche(zone);
-  return state.typeVehicule === "moto" && !IDS_VOYAGE.includes(zone.id) ? arrondi100(base * REMISE_MOTO) : base;
+  let base;
+  if (t) base = state.typeVehicule === "moto" ? t.prixMoto : t.prixVoiture;
+  else {
+    const zone = zoneActuelle();
+    const b = prixAffiche(zone);
+    base = state.typeVehicule === "moto" && !IDS_VOYAGE.includes(zone.id) ? arrondi100(b * REMISE_MOTO) : b;
+  }
+  return appliquerPromo(base);
 }
 
 async function reserver(e) {
@@ -528,7 +580,7 @@ async function envoyerColis(e) {
       colisDestTel: state.colisDestTel.trim(),
       clientNom: state.nom.trim(),
       clientTelephone: state.telephone.trim(),
-      tarif: 2000,
+      tarif: appliquerPromo(2000),
       statut: "en_attente",
       chauffeurId: null, chauffeurNom: null, chauffeurTelephone: null, chauffeurVehicule: null,
       chauffeurCibleId, candidatsIds, candidatIndex: 0,
@@ -593,7 +645,78 @@ function nouvelleCourse() {
   render();
 }
 
-// ---------- Écrans ----------
+// ---------- Compte ----------
+
+function ouvrirCompte() { allerA("compte"); }
+function ouvrirSousCompte(id) { allerA(id); }
+
+function choisirAvatar(a) { state.avatar = a; render(); }
+
+async function sauvegarderProfil(e) {
+  e.preventDefault();
+  ecrireLocal("goride_profil", { nom: state.nom.trim(), telephone: state.telephone.trim(), avatar: state.avatar });
+  allerA("compte");
+}
+
+async function chargerHistorique() {
+  if (!state.telephone.trim()) { state.historiqueCharge = true; state.historique = []; render(); return; }
+  try {
+    const q = query(collection(db, "courses"), where("clientTelephone", "==", state.telephone.trim()));
+    const snap = await getDocs(q);
+    state.historique = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt && a.createdAt ? b.createdAt.toMillis() - a.createdAt.toMillis() : 0))
+      .slice(0, 20);
+  } catch (e) {
+    state.historique = [];
+  }
+  state.historiqueCharge = true;
+  render();
+}
+
+function ajouterAdresse(e) {
+  e.preventDefault();
+  if (!state.adresseLabel.trim() || !state.adresseTexte.trim()) return;
+  state.adresses = [...state.adresses, { label: state.adresseLabel.trim(), texte: state.adresseTexte.trim() }];
+  ecrireLocal("goride_adresses", state.adresses);
+  state.adresseLabel = ""; state.adresseTexte = "";
+  render();
+}
+function supprimerAdresse(index) {
+  state.adresses = state.adresses.filter((_, i) => i !== index);
+  ecrireLocal("goride_adresses", state.adresses);
+  render();
+}
+
+async function appliquerCodePromo(e) {
+  e.preventDefault();
+  state.promoErreur = "";
+  if (!state.promoSaisie.trim()) return;
+  state.promoVerif = true;
+  render();
+  try {
+    const q = query(collection(db, "codes_promo"), where("code", "==", state.promoSaisie.trim().toUpperCase()), where("actif", "==", true));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      state.promoErreur = "Code invalide ou expiré.";
+      state.promo = null;
+    } else {
+      const d = snap.docs[0].data();
+      state.promo = { code: d.code, type: d.type, valeur: d.valeur };
+      ecrireLocal("goride_promo", state.promo);
+      state.promoSaisie = "";
+    }
+  } catch (e) {
+    state.promoErreur = "Erreur de vérification. Réessayez.";
+  }
+  state.promoVerif = false;
+  render();
+}
+function retirerPromo() {
+  state.promo = null;
+  ecrireLocal("goride_promo", null);
+  render();
+}
 
 function nomServiceActuel(id) {
   const s = SERVICES_ACCUEIL.find((x) => x.id === id);
@@ -634,6 +757,20 @@ function vueRecherche() {
         <input id="champ-destination" data-field="destination" placeholder="Où allez-vous ?" value="${escAttr(state.destination)}">
       </div>
     </div>
+    ${state.adresses.length > 0 ? `
+      <p class="eyebrow">Vos adresses</p>
+      <div class="suggestion-list">
+        ${state.adresses.map((a) => `
+          <button type="button" class="suggestion-row" data-action="suggestion" data-nom="${escAttr(a.texte)}">
+            <span class="suggestion-icon">📍</span>
+            <span class="suggestion-text">
+              <span class="suggestion-name">${a.label}</span>
+              <span class="suggestion-meta">${a.texte}</span>
+            </span>
+          </button>
+        `).join("")}
+      </div>
+    ` : ""}
     <p class="eyebrow">Destinations à Kribi</p>
     <div class="suggestion-list">
       ${SUGGESTIONS_KRIBI.map((s) => `
@@ -712,7 +849,7 @@ function vueDetails() {
         <input id="telephone" data-field="telephone" placeholder="6XX XX XX XX" value="${escAttr(state.telephone)}">
       </div>
       <div class="fare-display">
-        <span class="fare-label">${t ? formatDistance(t.km) : zoneActuelle().nom}</span>
+        <span class="fare-label">${t ? formatDistance(t.km) : zoneActuelle().nom}${state.promo ? " · " + state.promo.code : ""}</span>
         <span class="fare-amount">${formatFCFA(tarif)}</span>
       </div>
       ${state.erreur ? `<p style="color:var(--accent-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
@@ -756,8 +893,8 @@ function vueVoyageDetails() {
         <input id="telephone" data-field="telephone" placeholder="6XX XX XX XX" value="${escAttr(state.telephone)}">
       </div>
       <div class="fare-display">
-        <span class="fare-label">${zone.nom}</span>
-        <span class="fare-amount">~ ${formatFCFA(prixAffiche(zone))}</span>
+        <span class="fare-label">${zone.nom}${state.promo ? " · " + state.promo.code : ""}</span>
+        <span class="fare-amount">~ ${formatFCFA(prixCourseActuel())}</span>
       </div>
       ${state.erreur ? `<p style="color:var(--accent-bright);font-size:13px;margin-top:12px;">${state.erreur}</p>` : ""}
       <button class="btn btn-primary" style="margin-top:16px;" ${state.envoi ? "disabled" : ""} data-action="reserver">
@@ -958,6 +1095,157 @@ function vueRestoDetails() {
   `;
 }
 
+function vueCompte() {
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="accueil">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">Compte</h1>
+    </div>
+    <div class="compte-avatar">${state.avatar}</div>
+    <p class="compte-nom">${state.nom.trim() || "Votre nom"}</p>
+    <p class="compte-tel">${state.telephone.trim() || "Ajoutez votre téléphone"}</p>
+
+    <div class="icon-grid">
+      <button type="button" class="icon-grid-item" data-action="ecran" data-id="historique">
+        <span class="icon-grid-circle">🕐</span><span class="icon-grid-label">Historique</span>
+      </button>
+      <button type="button" class="icon-grid-item" data-action="ecran" data-id="assistance">
+        <span class="icon-grid-circle">🎧</span><span class="icon-grid-label">Assistance</span>
+      </button>
+      <button type="button" class="icon-grid-item" data-action="ecran" data-id="adresses">
+        <span class="icon-grid-circle">📍</span><span class="icon-grid-label">Adresses</span>
+      </button>
+      <button type="button" class="icon-grid-item" data-action="ecran" data-id="parametres">
+        <span class="icon-grid-circle">⚙️</span><span class="icon-grid-label">Paramètres</span>
+      </button>
+    </div>
+
+    <button type="button" class="menu-row" data-action="ecran" data-id="reductions">
+      <span class="menu-row-text">
+        <span class="menu-row-emoji">🎁</span>
+        <span><span class="menu-row-nom" style="display:block;">Réductions</span><span class="menu-row-desc">${state.promo ? `Code ${state.promo.code} actif` : "Saisir un code promotionnel"}</span></span>
+      </span>
+      <span style="color:var(--dim);">›</span>
+    </button>
+  `;
+}
+
+function vueHistorique() {
+  if (!state.historiqueCharge) { chargerHistorique(); }
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="compte">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">🕐 Historique</h1>
+    </div>
+    ${!state.historiqueCharge ? `<p class="subtitle">Chargement…</p>` : state.historique.length === 0 ? `
+      <p class="subtitle">${state.telephone.trim() ? "Aucune course trouvée pour ce numéro." : "Renseignez votre téléphone dans Paramètres pour voir votre historique."}</p>
+    ` : state.historique.map((c) => `
+      <div class="card">
+        <span class="status-pill ${c.statut === "en_attente" ? "attente" : c.statut === "acceptee" ? "acceptee" : "terminee"}"><span class="status-dot"></span> ${c.statut === "en_attente" ? "En attente" : c.statut === "acceptee" ? "En cours" : "Terminée"}</span>
+        <p class="ride-route">${c.depart} → ${c.destination}</p>
+        <p class="ride-price">${formatFCFA(c.tarif)}</p>
+      </div>
+    `).join("")}
+  `;
+}
+
+function vueAdresses() {
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="compte">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">📍 Adresses</h1>
+    </div>
+    ${state.adresses.length === 0 ? `<p class="subtitle">Aucune adresse enregistrée.</p>` : state.adresses.map((a, i) => `
+      <div class="menu-row" style="cursor:default;">
+        <span class="menu-row-text">
+          <span class="menu-row-emoji">📍</span>
+          <span><span class="menu-row-nom" style="display:block;">${a.label}</span><span class="menu-row-desc">${a.texte}</span></span>
+        </span>
+        <button type="button" class="btn-link" data-action="supprimer-adresse" data-id="${i}">Retirer</button>
+      </div>
+    `).join("")}
+    <form class="card" id="form-adresse" style="margin-top:16px;">
+      <p style="font-family:var(--font-display);font-size:16px;margin:0 0 14px;">Ajouter une adresse</p>
+      <div class="field">
+        <label for="adresseLabel">Nom (Domicile, Travail…)</label>
+        <input id="adresseLabel" data-field="adresseLabel" placeholder="Ex. Domicile" value="${escAttr(state.adresseLabel)}">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="adresseTexte">Adresse</label>
+        <input id="adresseTexte" data-field="adresseTexte" placeholder="Ex. Quartier Dombé, près du marché" value="${escAttr(state.adresseTexte)}">
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px;" data-action="ajouter-adresse">Enregistrer</button>
+    </form>
+  `;
+}
+
+function vueParametres() {
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="compte">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">⚙️ Paramètres</h1>
+    </div>
+    <p class="eyebrow">Avatar</p>
+    <div class="avatar-picker">
+      ${AVATARS_DISPONIBLES.map((a) => `
+        <button type="button" class="avatar-option ${a === state.avatar ? "active" : ""}" data-action="avatar" data-id="${a}">${a}</button>
+      `).join("")}
+    </div>
+    <form class="card" id="form-parametres">
+      <div class="field">
+        <label for="nom">Nom</label>
+        <input id="nom" data-field="nom" placeholder="Nom et prénom" value="${escAttr(state.nom)}">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="telephone">Téléphone</label>
+        <input id="telephone" data-field="telephone" placeholder="6XX XX XX XX" value="${escAttr(state.telephone)}">
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px;" data-action="enregistrer-profil">Enregistrer</button>
+    </form>
+  `;
+}
+
+function vueAssistance() {
+  const telLien = ASSISTANCE_TEL.replace(/\s/g, "");
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="compte">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">🎧 Assistance</h1>
+    </div>
+    <p class="subtitle">Une question, un problème avec une course ? Contactez-nous directement.</p>
+    <a href="tel:${telLien}" class="card" style="display:block;text-align:center;text-decoration:none;color:inherit;">
+      <p style="font-size:13px;color:var(--dim);margin:0 0 8px;">Appeler l'assistance</p>
+      <p style="font-family:var(--font-display);font-weight:800;font-size:20px;margin:0;">${ASSISTANCE_TEL}</p>
+    </a>
+  `;
+}
+
+function vueReductions() {
+  return `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <button type="button" class="back-btn" data-action="ecran" data-id="compte">←</button>
+      <h1 class="title" style="margin:0;font-size:20px;">🎁 Réductions</h1>
+    </div>
+    ${state.promo ? `
+      <div class="card" style="text-align:center;">
+        <p style="font-size:13px;color:var(--dim);margin:0 0 8px;">Code actif</p>
+        <p style="font-family:var(--font-display);font-weight:800;font-size:22px;margin:0 0 4px;color:var(--accent-bright);">${state.promo.code}</p>
+        <p style="font-size:13px;color:var(--dim);margin:0 0 16px;">${state.promo.type === "pourcentage" ? `-${state.promo.valeur}%` : `-${formatFCFA(state.promo.valeur)}`} sur vos prochaines courses</p>
+        <button type="button" class="btn btn-secondary" data-action="retirer-promo">Retirer ce code</button>
+      </div>
+    ` : `
+      <form class="card" id="form-promo">
+        <div class="field" style="margin-bottom:0;">
+          <label for="promoSaisie">Code promotionnel</label>
+          <input id="promoSaisie" data-field="promoSaisie" placeholder="Ex. BIENVENUE" value="${escAttr(state.promoSaisie)}" style="text-transform:uppercase;">
+        </div>
+        ${state.promoErreur ? `<p style="color:var(--accent-bright);font-size:13px;margin-top:12px;">${state.promoErreur}</p>` : ""}
+        <button class="btn btn-primary" style="margin-top:16px;" ${state.promoVerif ? "disabled" : ""} data-action="appliquer-promo">${state.promoVerif ? "Vérification…" : "Appliquer"}</button>
+      </form>
+    `}
+  `;
+}
+
 function vueChoixChauffeur() {
   const liste = chauffeursTries();
   return `
@@ -1033,13 +1321,22 @@ function render() {
   else if (state.ecran === "location-details") contenu = vueLocationDetails();
   else if (state.ecran === "restos-catalogue") contenu = vueRestosCatalogue();
   else if (state.ecran === "resto-details") contenu = vueRestoDetails();
+  else if (state.ecran === "compte") contenu = vueCompte();
+  else if (state.ecran === "historique") contenu = vueHistorique();
+  else if (state.ecran === "adresses") contenu = vueAdresses();
+  else if (state.ecran === "parametres") contenu = vueParametres();
+  else if (state.ecran === "assistance") contenu = vueAssistance();
+  else if (state.ecran === "reductions") contenu = vueReductions();
   else contenu = vueAccueil();
 
   app.innerHTML = `
     <div class="page">
       <header class="topbar">
         <div class="brand"><span class="brand-mark">Go</span>Ride Kribi</div>
-        <a href="chauffeur.html" class="nav-link">Espace chauffeur</a>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <a href="chauffeur.html" class="nav-link">Espace chauffeur</a>
+          <button type="button" class="avatar-btn" data-action="ecran" data-id="compte">${state.avatar}</button>
+        </div>
       </header>
       <main class="main">${contenu}</main>
     </div>
@@ -1066,6 +1363,12 @@ function render() {
   if (formSpecial) formSpecial.addEventListener("submit", envoyerDemandeSpeciale);
   const formLocation = document.getElementById("form-location");
   if (formLocation) formLocation.addEventListener("submit", envoyerDemandeLocation);
+  const formAdresse = document.getElementById("form-adresse");
+  if (formAdresse) formAdresse.addEventListener("submit", ajouterAdresse);
+  const formParametres = document.getElementById("form-parametres");
+  if (formParametres) formParametres.addEventListener("submit", sauvegarderProfil);
+  const formPromo = document.getElementById("form-promo");
+  if (formPromo) formPromo.addEventListener("submit", appliquerCodePromo);
 
   const champDest = document.getElementById("champ-destination");
   if (champDest && state.ecran === "recherche" && !state.destination) champDest.focus();
@@ -1076,7 +1379,7 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (!btn) return;
   const action = btn.dataset.action;
   if (action === "service") { choisirService(btn.dataset.id); }
-  if (action === "ecran") { allerA(btn.dataset.id); }
+  if (action === "ecran") { if (btn.dataset.id === "historique") state.historiqueCharge = false; allerA(btn.dataset.id); }
   if (action === "suggestion") { choisirSuggestion(btn.dataset.nom, btn.dataset.lat ? parseFloat(btn.dataset.lat) : null, btn.dataset.lng ? parseFloat(btn.dataset.lng) : null); }
   if (action === "valider-recherche") { if (state.destination.trim()) allerA("details"); }
   if (action === "zone") { state.zoneId = btn.dataset.id; render(); }
@@ -1092,6 +1395,10 @@ document.getElementById("app").addEventListener("click", (e) => {
   }
   if (action === "resto") { choisirResto(RESTAURANTS_KRIBI[Number(btn.dataset.id)]); }
   if (action === "livraison-resto") { demanderLivraisonResto(); }
+  if (action === "avatar") { choisirAvatar(btn.dataset.id); }
+  if (action === "ajouter-adresse") { /* géré par le submit du formulaire */ }
+  if (action === "supprimer-adresse") { supprimerAdresse(Number(btn.dataset.id)); }
+  if (action === "retirer-promo") { retirerPromo(); }
   if (action === "nouvelle-course") { nouvelleCourse(); }
 });
 
